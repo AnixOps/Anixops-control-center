@@ -1,0 +1,95 @@
+import axios from 'axios'
+import { useAuthStore } from '@/stores/auth'
+
+const api = axios.create({
+  baseURL: '/api/v1',
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+// Request interceptor
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => Promise.reject(error)
+)
+
+// Response interceptor
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      const authStore = useAuthStore()
+      authStore.logout()
+      window.location.href = '/login'
+    }
+    return Promise.reject(error)
+  }
+)
+
+export default api
+
+// API methods
+export const nodesApi = {
+  list: () => api.get('/nodes'),
+  get: (id) => api.get(`/nodes/${id}`),
+  create: (data) => api.post('/nodes', data),
+  update: (id, data) => api.put(`/nodes/${id}`, data),
+  delete: (id) => api.delete(`/nodes/${id}`),
+  stats: (id) => api.get(`/nodes/${id}/stats`)
+}
+
+export const agentsApi = {
+  list: () => api.get('/agents'),
+  connect: (data) => api.post('/agents/connect', data),
+  disconnect: () => api.post('/agents/disconnect'),
+  exec: (data) => api.post('/agents/exec', data),
+  info: (id) => api.get(`/agents/${id}/info`)
+}
+
+export const usersApi = {
+  list: (params) => api.get('/users', { params }),
+  get: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+  ban: (id) => api.post(`/users/${id}/ban`),
+  unban: (id) => api.post(`/users/${id}/unban`)
+}
+
+export const playbooksApi = {
+  list: () => api.get('/playbooks'),
+  get: (name) => api.get(`/playbooks/${name}`),
+  run: (data) => api.post('/playbooks/run', data),
+  validate: (data) => api.post('/playbooks/validate', data)
+}
+
+export const dashboardApi = {
+  get: () => api.get('/dashboard'),
+  stats: () => api.get('/dashboard/stats')
+}
+
+export const pluginsApi = {
+  list: () => api.get('/plugins'),
+  get: (name) => api.get(`/plugins/${name}`),
+  execute: (name, action, params) => api.post(`/plugins/${name}/execute`, { action, params }),
+  status: (name) => api.get(`/plugins/${name}/status`),
+  start: (name) => api.post(`/admin/plugins/${name}/start`),
+  stop: (name) => api.post(`/admin/plugins/${name}/stop`)
+}
+
+export const logsApi = {
+  list: (params) => api.get('/logs', { params })
+}
+
+export const settingsApi = {
+  get: () => api.get('/settings'),
+  update: (data) => api.put('/settings', data)
+}
