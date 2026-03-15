@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -530,11 +530,11 @@ func (m Model) renderDashboard() string {
 
 // NodeItem represents a node list item
 type NodeItem struct {
-	name     string
-	host     string
-	status   string
-	users    int
-	traffic  string
+	name    string
+	host    string
+	status  string
+	users   int
+	traffic string
 }
 
 func (n NodeItem) FilterValue() string { return n.name }

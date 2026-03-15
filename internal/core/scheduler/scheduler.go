@@ -10,14 +10,14 @@ import (
 
 // Job represents a scheduled job
 type Job struct {
-	ID        string
-	Name      string
-	Schedule  string // cron expression
-	Handler   func(ctx context.Context) error
-	LastRun   time.Time
-	NextRun   time.Time
-	Enabled   bool
-	Metadata  map[string]interface{}
+	ID       string
+	Name     string
+	Schedule string // cron expression
+	Handler  func(ctx context.Context) error
+	LastRun  time.Time
+	NextRun  time.Time
+	Enabled  bool
+	Metadata map[string]interface{}
 }
 
 // Scheduler manages scheduled jobs

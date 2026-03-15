@@ -20,18 +20,18 @@ const (
 // Claims represents JWT claims
 type Claims struct {
 	jwt.RegisteredClaims
-	Role        string   `json:"role"`
-	Scopes      []string `json:"scopes,omitempty"`
-	TenantID    string   `json:"tenant_id,omitempty"`
-	AuthProvider string  `json:"auth_provider"` // local, oauth, ldap, saml
+	Role         string   `json:"role"`
+	Scopes       []string `json:"scopes,omitempty"`
+	TenantID     string   `json:"tenant_id,omitempty"`
+	AuthProvider string   `json:"auth_provider"` // local, oauth, ldap, saml
 }
 
 // JWTManager handles JWT operations
 type JWTManager struct {
-	secret         []byte
-	accessExpire   time.Duration
-	refreshExpire  time.Duration
-	issuer         string
+	secret        []byte
+	accessExpire  time.Duration
+	refreshExpire time.Duration
+	issuer        string
 }
 
 // NewJWTManager creates a new JWT manager
@@ -124,7 +124,7 @@ func CheckPassword(password, hash string) bool {
 
 // Errors
 var (
-	ErrInvalidToken     = errors.New("invalid token")
-	ErrTokenExpired     = errors.New("token expired")
-	ErrInvalidClaims    = errors.New("invalid claims")
+	ErrInvalidToken  = errors.New("invalid token")
+	ErrTokenExpired  = errors.New("token expired")
+	ErrInvalidClaims = errors.New("invalid claims")
 )

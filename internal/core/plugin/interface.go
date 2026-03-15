@@ -50,9 +50,9 @@ type ObservablePlugin interface {
 
 // Status represents plugin status
 type Status struct {
-	State       string                 `json:"state"`        // running, stopped, error
-	Health      string                 `json:"health"`       // healthy, degraded, unhealthy
-	Metrics     map[string]interface{} `json:"metrics"`      // plugin-specific metrics
+	State       string                 `json:"state"`   // running, stopped, error
+	Health      string                 `json:"health"`  // healthy, degraded, unhealthy
+	Metrics     map[string]interface{} `json:"metrics"` // plugin-specific metrics
 	LastUpdated int64                  `json:"last_updated"`
 }
 

@@ -45,8 +45,8 @@ func (c *MobileClient) Login(email, password string) (map[string]interface{}, er
 func (c *MobileClient) GetDashboard() (map[string]interface{}, error) {
 	// TODO: Implement HTTP request to /api/v1/dashboard
 	return map[string]interface{}{
-		"nodes":  8,
-		"users":  357,
+		"nodes":   8,
+		"users":   357,
 		"traffic": "1.2TB",
 	}, nil
 }

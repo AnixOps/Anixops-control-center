@@ -20,10 +20,10 @@ type Config struct {
 
 // V2boardPlugin implements the plugin interface for v2board
 type V2boardPlugin struct {
-	config   Config
-	client   *resty.Client
-	status   plugin.Status
-	mu       sync.RWMutex
+	config Config
+	client *resty.Client
+	status plugin.Status
+	mu     sync.RWMutex
 }
 
 // New creates a new v2board plugin
@@ -69,7 +69,7 @@ func (p *V2boardPlugin) Init(ctx context.Context, config map[string]interface{})
 	// Create HTTP client
 	p.client = resty.New().
 		SetBaseURL(p.config.Host).
-		SetTimeout(time.Duration(p.config.Timeout) * time.Second).
+		SetTimeout(time.Duration(p.config.Timeout)*time.Second).
 		SetHeader("Content-Type", "application/json")
 
 	if p.config.APIKey != "" {

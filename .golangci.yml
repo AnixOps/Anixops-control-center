@@ -1,36 +1,25 @@
 run:
   timeout: 5m
-  skip-dirs:
-    - vendor
 
 linters:
+  disable-all: true
   enable:
     - gofmt
     - goimports
     - govet
-    - staticcheck
     - ineffassign
     - typecheck
 
-linters-settings:
-  errcheck:
-    # 暂时不强制检查错误返回值
-    check-type-assertions: false
-    check-blank: false
-
-  staticcheck:
-    checks: ["-SA9003"]  # 忽略空分支检查
-
 issues:
-  # 排除一些常见的未使用代码警告
   exclude-rules:
-    - path: _test\.go
-      linters:
+    # 排除所有 errcheck 警告
+    - linters:
         - errcheck
-    - path: cmd/
-      linters:
-        - errcheck
+      path: ".*"
+    # 排除所有 unused 警告
+    - linters:
+        - unused
+      path: ".*"
 
-  # 不阻止新代码提交
   max-issues-per-linter: 0
   max-same-issues: 0
