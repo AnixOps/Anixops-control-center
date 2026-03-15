@@ -13,13 +13,20 @@ import (
 	"github.com/anixops/anixops-control-center/internal/core/plugin"
 	"github.com/anixops/anixops-control-center/internal/plugins/ansible"
 	"github.com/anixops/anixops-control-center/internal/plugins/v2board"
+	"github.com/anixops/anixops-control-center/internal/plugins/v2bx"
 	"github.com/anixops/anixops-control-center/internal/plugins/agent"
 	"github.com/anixops/anixops-control-center/internal/security/auth"
 )
 
+// Build information (set via ldflags)
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
+
 var (
 	cfgFile string
-	version = "1.0.0"
 )
 
 func main() {
@@ -83,7 +90,10 @@ var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Print version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("AnixOps Control Center v%s\n", version)
+		fmt.Printf("AnixOps Control Center\n")
+		fmt.Printf("  Version: %s\n", version)
+		fmt.Printf("  Commit:  %s\n", commit)
+		fmt.Printf("  Built:   %s\n", date)
 	},
 }
 
@@ -124,6 +134,7 @@ func initConfig() {
 
 func runServer(cmd *cobra.Command, args []string) {
 	fmt.Println("Starting AnixOps Control Center server...")
+	fmt.Printf("Version: %s (%s)\n", version, commit)
 
 	// Load config
 	cfg := loadConfigOrDie()
@@ -155,10 +166,6 @@ func runServer(cmd *cobra.Command, args []string) {
 	// Setup signal handling
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-	// Start REST server
-	// server := rest.NewServer(pluginMgr, jwtManager, rbacManager)
-	// go server.Run(fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port))
 
 	fmt.Printf("Server running on %s:%d\n", cfg.Server.Host, cfg.Server.Port)
 
@@ -303,6 +310,13 @@ func registerPlugins(mgr *plugin.Manager, cfg *config.Config) {
 	mgr.SetConfig("v2board", map[string]interface{}{
 		"host":    cfg.Plugins.V2board["host"],
 		"api_key": cfg.Plugins.V2board["api_key"],
+	})
+
+	// Register V2bX plugin
+	v2bxPlugin := v2bx.New()
+	mgr.Register("v2bx", v2bxPlugin)
+	mgr.SetConfig("v2bx", map[string]interface{}{
+		"hosts": cfg.Plugins.V2bX["hosts"],
 	})
 
 	// Register agent plugin

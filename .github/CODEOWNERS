@@ -1,0 +1,40 @@
+# CODEOWNERS - Define code ownership for reviews
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owners for everything
+* @anixops/core-team
+
+# Core system - requires core team review
+/internal/core/plugin/ @anixops/core-team
+/internal/core/config/ @anixops/core-team
+/internal/core/eventbus/ @anixops/core-team
+/internal/core/scheduler/ @anixops/core-team
+
+# Security - requires core team review
+/internal/security/ @anixops/core-team
+
+# API layer
+/internal/api/ @anixops/api-team
+
+# Plugins
+/internal/plugins/ansible/ @anixops/ansible-team
+/internal/plugins/v2board/ @anixops/v2board-team
+/internal/plugins/v2bx/ @anixops/v2bx-team
+/internal/plugins/agent/ @anixops/agent-team
+
+# TUI interface
+/internal/tui/ @anixops/ui-team
+
+# Web GUI
+/web/ @anixops/ui-team
+
+# CI/CD and workflows
+/.github/workflows/ @anixops/core-team
+/.github/branch-protection/ @anixops/core-team
+
+# Documentation
+/README.md @anixops/docs-team
+/docs/ @anixops/docs-team
+
+# Deployment
+/deployments/ @anixops/ops-team

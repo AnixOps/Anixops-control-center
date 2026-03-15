@@ -1,0 +1,129 @@
+name: Mobile Build (Future)
+
+# This workflow is prepared for future mobile support
+# Currently a placeholder that will be activated when mobile modules are ready
+
+on:
+  push:
+    branches: [dev]
+    paths:
+      - 'internal/mobile/**'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Target platform'
+        required: true
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+
+env:
+  GO_VERSION: '1.24'
+
+jobs:
+  check-mobile-ready:
+    name: Check Mobile Module Status
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check mobile module
+        id: check
+        run: |
+          if [ -d "internal/mobile" ]; then
+            echo "ready=true" >> $GITHUB_OUTPUT
+            echo "Mobile module detected"
+          else
+            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "Mobile module not yet created"
+            echo "Create internal/mobile/ package to enable mobile builds"
+          fi
+
+  build-android:
+    name: Build Android
+    needs: check-mobile-ready
+    if: needs.check-mobile-ready.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          gomobile init
+
+      - name: Build Android AAR
+        run: |
+          mkdir -p dist/android
+          gomobile bind -target=android -o dist/android/anixops.aar ./internal/mobile
+
+      - name: Upload Android artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anixops-android
+          path: dist/android/
+          retention-days: 30
+
+  build-ios:
+    name: Build iOS
+    needs: check-mobile-ready
+    if: needs.check-mobile-ready.outputs.ready == 'true'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install gomobile
+        run: |
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          go install golang.org/x/mobile/cmd/gobind@latest
+          gomobile init
+
+      - name: Build iOS Framework
+        run: |
+          mkdir -p dist/ios
+          gomobile bind -target=ios -o dist/ios/AnixOps.framework ./internal/mobile
+
+      - name: Upload iOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anixops-ios
+          path: dist/ios/
+          retention-days: 30
+
+  mobile-placeholder:
+    name: Mobile Build Placeholder
+    needs: check-mobile-ready
+    if: needs.check-mobile-ready.outputs.ready == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Info
+        run: |
+          echo "## Mobile Build Status" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Mobile support is prepared but not yet activated." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "To enable mobile builds:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Create \`internal/mobile/\` package" >> $GITHUB_STEP_SUMMARY
+          echo "2. Implement mobile-friendly APIs" >> $GITHUB_STEP_SUMMARY
+          echo "3. This workflow will automatically detect and build for Android/iOS" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,285 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, production, 'v*.*.*']
+  pull_request:
+    branches: [dev, production]
+
+env:
+  GO_VERSION: '1.24'
+
+jobs:
+  # ============================================
+  # Code Quality Check
+  # ============================================
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          args: --timeout=5m
+
+  # ============================================
+  # Unit Tests
+  # ============================================
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    outputs:
+      coverage: ${{ steps.coverage.outputs.coverage }}
+      passed: ${{ steps.coverage.outputs.passed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run tests with coverage
+        id: coverage
+        run: |
+          go test -v -coverprofile=coverage.out -covermode=atomic ./...
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "Test coverage: ${COVERAGE}%"
+
+          # Calculate pass rate
+          TOTAL=$(go test -v ./... 2>&1 | grep -c "PASS\|FAIL" || echo "0")
+          PASSED=$(go test -v ./... 2>&1 | grep -c "^PASS" || echo "0")
+          if [ "$TOTAL" -gt 0 ]; then
+            PASS_RATE=$((PASSED * 100 / TOTAL))
+          else
+            PASS_RATE=100
+          fi
+          echo "passed=$PASS_RATE" >> $GITHUB_OUTPUT
+          echo "Pass rate: ${PASS_RATE}%"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.out
+          fail_ci_if_error: false
+
+  # ============================================
+  # Critical Function Tests (100% required for production)
+  # ============================================
+  critical-tests:
+    name: Critical Tests
+    runs-on: ubuntu-latest
+    outputs:
+      passed: ${{ steps.critical.outputs.passed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run critical function tests
+        id: critical
+        run: |
+          echo "Running critical function tests..."
+
+          # Plugin Manager tests (critical)
+          go test -v -run "TestRegister|TestStartPlugin|TestStopPlugin" ./internal/core/plugin/... -count=1
+          PLUGIN_RESULT=$?
+
+          # Auth tests (critical)
+          go test -v -run "TestValidateToken|TestCheckPassword|TestHasPermission" ./internal/security/auth/... -count=1
+          AUTH_RESULT=$?
+
+          # Config tests (critical)
+          go test -v -run "TestDefaultConfig|TestLoadFromString" ./internal/core/config/... -count=1
+          CONFIG_RESULT=$?
+
+          if [ $PLUGIN_RESULT -eq 0 ] && [ $AUTH_RESULT -eq 0 ] && [ $CONFIG_RESULT -eq 0 ]; then
+            echo "All critical tests passed!"
+            echo "passed=true" >> $GITHUB_OUTPUT
+          else
+            echo "Critical tests failed!"
+            echo "passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+  # ============================================
+  # Dev Branch Quality Gate (60% coverage)
+  # ============================================
+  dev-quality-gate:
+    name: Dev Quality Gate (60%)
+    needs: [test, lint]
+    if: github.ref == 'refs/heads/dev' || startsWith(github.base_ref, 'dev')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=${{ needs.test.outputs.coverage }}
+          echo "Coverage: ${COVERAGE}%"
+          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below 60% threshold for dev branch"
+            exit 1
+          fi
+          echo "✅ Dev quality gate passed (coverage: ${COVERAGE}%)"
+
+  # ============================================
+  # Production Branch Quality Gate (80% + critical 100%)
+  # ============================================
+  production-quality-gate:
+    name: Production Quality Gate (80% + Critical 100%)
+    needs: [test, critical-tests, lint]
+    if: github.ref == 'refs/heads/production' || startsWith(github.base_ref, 'production') || startsWith(github.ref, 'refs/heads/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check coverage threshold
+        run: |
+          COVERAGE=${{ needs.test.outputs.coverage }}
+          CRITICAL=${{ needs.critical-tests.outputs.passed }}
+          echo "Coverage: ${COVERAGE}%"
+          echo "Critical tests: ${CRITICAL}"
+
+          if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below 80% threshold for production branch"
+            exit 1
+          fi
+
+          if [ "$CRITICAL" != "true" ]; then
+            echo "::error::Critical tests must pass 100% for production branch"
+            exit 1
+          fi
+
+          echo "✅ Production quality gate passed (coverage: ${COVERAGE}%, critical: 100%)"
+
+  # ============================================
+  # Build All Platforms
+  # ============================================
+  build:
+    name: Build
+    needs: [test]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - goos: linux
+            goarch: amd64
+            platform: linux-amd64
+          - goos: linux
+            goarch: arm64
+            platform: linux-arm64
+          # Windows
+          - goos: windows
+            goarch: amd64
+            platform: windows-amd64
+          - goos: windows
+            goarch: arm64
+            platform: windows-arm64
+          # macOS
+          - goos: darwin
+            goarch: amd64
+            platform: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            platform: darwin-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build CLI
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          BINARY_NAME=anixops
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            BINARY_NAME=anixops.exe
+          fi
+
+          go build -ldflags="-s -w -X 'main.version=${{ github.ref_name }}' -X 'main.commit=${{ github.sha }}' -X 'main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)'" -o dist/${{ matrix.platform }}/${BINARY_NAME} cmd/anixops/main.go
+
+          # Build TUI
+          TUI_NAME=anixops-tui
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            TUI_NAME=anixops-tui.exe
+          fi
+          go build -ldflags="-s -w" -o dist/${{ matrix.platform }}/${TUI_NAME} cmd/anixops-tui/main.go
+
+      - name: Create archive
+        run: |
+          cd dist/${{ matrix.platform }}
+          tar -czvf ../../anixops-${{ matrix.platform }}.tar.gz *
+          cd ../..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anixops-${{ matrix.platform }}
+          path: anixops-${{ matrix.platform }}.tar.gz
+          retention-days: 30
+
+  # ============================================
+  # Build Mobile (Android - Future Support)
+  # ============================================
+  build-android:
+    name: Build Android (Future)
+    needs: [test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check Android build capability
+        run: |
+          echo "Android build preparation for future support"
+          echo "Will use gomobile for Android/iOS builds when ready"
+          # gomobile bind -target=android -o dist/android/anixops.aar ./internal/mobile
+
+      - name: Upload placeholder
+        uses: actions/upload-artifact@v4
+        with:
+          name: anixops-android-placeholder
+          path: README.md
+          retention-days: 1
+
+  # ============================================
+  # Summary
+  # ============================================
+  summary:
+    name: CI Summary
+    needs: [test, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate Summary
+        run: |
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Coverage | ${{ needs.test.outputs.coverage }}% |" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | All (Win/Mac/Linux amd64/arm64) |" >> $GITHUB_STEP_SUMMARY

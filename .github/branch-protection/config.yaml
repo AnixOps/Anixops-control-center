@@ -1,0 +1,99 @@
+# Branch Protection Configuration
+# Apply these settings using GitHub API or Settings UI
+
+branches:
+  # ============================================
+  # Production Branch - Strict Protection
+  # ============================================
+  production:
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - "Lint"
+          - "Test"
+          - "Critical Tests"
+          - "Production Quality Gate (80% + Critical 100%)"
+          - "Build"
+      enforce_admins: true
+      required_pull_request_reviews:
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+        required_approving_review_count: 2
+      restrictions:
+        users: []
+        teams: ["core-team"]
+      required_linear_history: true
+      allow_force_pushes: false
+      allow_deletions: false
+      block_creations: true
+      required_conversation_resolution: true
+
+  # ============================================
+  # Development Branch - Moderate Protection
+  # ============================================
+  dev:
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - "Lint"
+          - "Test"
+          - "Dev Quality Gate (60%)"
+          - "Build"
+      enforce_admins: false
+      required_pull_request_reviews:
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: false
+        required_approving_review_count: 1
+      restrictions: null
+      required_linear_history: false
+      allow_force_pushes: false
+      allow_deletions: false
+      required_conversation_resolution: true
+
+  # ============================================
+  # Version Branches (v*.*.*) - Full Protection
+  # These branches are frozen and immutable
+  # ============================================
+  "v*.*.*":
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - "Lint"
+          - "Test"
+          - "Critical Tests"
+          - "Production Quality Gate (80% + Critical 100%)"
+          - "Build"
+      enforce_admins: true
+      required_pull_request_reviews:
+        required_approving_review_count: 999  # Effectively blocks all PRs
+      restrictions:
+        users: []
+        teams: []
+      required_linear_history: true
+      allow_force_pushes: false
+      allow_deletions: false
+      block_creations: true
+      required_conversation_resolution: true
+
+# ============================================
+# CODEOWNERS Configuration
+# Create .github/CODEOWNERS file
+# ============================================
+codeowners: |
+  # Default owners
+  * @anixops/core-team
+
+  # Critical paths require core team review
+  /internal/core/ @anixops/core-team
+  /internal/security/ @anixops/core-team
+  /.github/ @anixops/core-team
+
+  # Plugin development
+  /internal/plugins/ @anixops/plugin-team
+
+  # Documentation
+  /docs/ @anixops/docs-team
+  /README.md @anixops/docs-team

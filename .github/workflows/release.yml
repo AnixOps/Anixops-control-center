@@ -1,0 +1,351 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - production
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v0.1.0)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Pre-release (RC version)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  GO_VERSION: '1.24'
+
+permissions:
+  contents: write
+
+jobs:
+  # ============================================
+  # Version Determination
+  # ============================================
+  version:
+    name: Determine Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            PRERELEASE="${{ github.event.inputs.prerelease }}"
+          elif [[ "${{ github.ref }}" == refs/heads/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            PRERELEASE="false"
+          elif [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            # RC version for dev branch
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            COMMIT_COUNT=$(git rev-list --count HEAD ^$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0") 2>/dev/null || echo "1")
+            VERSION="${LATEST_TAG}-rc.${COMMIT_COUNT}"
+            PRERELEASE="true"
+          else
+            # Auto version for production
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            MAJOR=$(echo $LATEST_TAG | sed 's/v\([0-9]*\).*/\1/')
+            MINOR=$(echo $LATEST_TAG | sed 's/v[0-9]*\.\([0-9]*\).*/\1/')
+            PATCH=$(echo $LATEST_TAG | sed 's/v[0-9]*\.[0-9]*\.\([0-9]*\).*/\1/')
+            NEW_PATCH=$((PATCH + 1))
+            VERSION="v${MAJOR}.${MINOR}.${NEW_PATCH}"
+            PRERELEASE="false"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+          echo "tag=$VERSION" >> $GITHUB_OUTPUT
+          echo "Determined version: $VERSION (prerelease: $PRERELEASE)"
+
+  # ============================================
+  # Build All Platforms
+  # ============================================
+  build:
+    name: Build
+    needs: [version]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            platform: linux-amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            platform: linux-arm64
+          # Windows
+          - os: ubuntu-latest
+            goos: windows
+            goarch: amd64
+            platform: windows-amd64
+          - os: ubuntu-latest
+            goos: windows
+            goarch: arm64
+            platform: windows-arm64
+          # macOS
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            platform: darwin-amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            platform: darwin-arm64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          COMMIT="${{ github.sha }}"
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          # Create dist directory
+          mkdir -p dist/${{ matrix.platform }}
+
+          # Build CLI
+          BINARY_NAME=anixops
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            BINARY_NAME=anixops.exe
+          fi
+
+          go build -ldflags="-s -w -X 'main.version=${VERSION}' -X 'main.commit=${COMMIT}' -X 'main.date=${DATE}'" -o dist/${{ matrix.platform }}/${BINARY_NAME} cmd/anixops/main.go
+
+          # Build TUI
+          TUI_NAME=anixops-tui
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            TUI_NAME=anixops-tui.exe
+          fi
+          go build -ldflags="-s -w -X 'main.version=${VERSION}' -X 'main.commit=${COMMIT}' -X 'main.date=${DATE}'" -o dist/${{ matrix.platform }}/${TUI_NAME} cmd/anixops-tui/main.go
+
+          # Copy README and LICENSE
+          cp README.md dist/${{ matrix.platform }}/ 2>/dev/null || true
+          cp LICENSE dist/${{ matrix.platform }}/ 2>/dev/null || true
+
+      - name: Create archive
+        run: |
+          cd dist/${{ matrix.platform }}
+
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            7z a -tzip ../../anixops-${{ needs.version.outputs.version }}-${{ matrix.platform }}.zip *
+          else
+            tar -czvf ../../anixops-${{ needs.version.outputs.version }}-${{ matrix.platform }}.tar.gz *
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: anixops-${{ matrix.platform }}
+          path: |
+            anixops-${{ needs.version.outputs.version }}-${{ matrix.platform }}.zip
+            anixops-${{ needs.version.outputs.version }}-${{ matrix.platform }}.tar.gz
+          retention-days: 90
+
+  # ============================================
+  # Build Checksums
+  # ============================================
+  checksums:
+    name: Generate Checksums
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate checksums
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          mkdir -p release
+
+          # Copy all archives to release directory
+          find artifacts -name "*.zip" -o -name "*.tar.gz" | while read f; do
+            cp "$f" release/
+          done
+
+          # Generate checksums
+          cd release
+          sha256sum * > checksums.sha256
+          sha512sum * > checksums.sha512
+
+          # List files
+          ls -la
+
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: checksums
+          path: release/
+          retention-days: 90
+
+  # ============================================
+  # Create Release
+  # ============================================
+  release:
+    name: Create Release
+    needs: [version, build, checksums]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          mkdir -p release
+
+          # Copy all archives
+          find artifacts -name "*.zip" -o -name "*.tar.gz" -o -name "checksums.*" | while read f; do
+            cp "$f" release/ 2>/dev/null || true
+          done
+
+          ls -la release/
+
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          PRERELEASE="${{ needs.version.outputs.prerelease }}"
+
+          if [ "$PRERELEASE" = "true" ]; then
+            TITLE="🚀 Release Candidate ${VERSION}"
+          else
+            TITLE="🎉 Release ${VERSION}"
+          fi
+
+          cat << EOF > release_notes.md
+          ## ${TITLE}
+
+          ### 📦 Downloads
+
+          | Platform | Architecture | Download |
+          |----------|-------------|----------|
+          | Linux | amd64 | anixops-${VERSION}-linux-amd64.tar.gz |
+          | Linux | arm64 | anixops-${VERSION}-linux-arm64.tar.gz |
+          | Windows | amd64 | anixops-${VERSION}-windows-amd64.zip |
+          | Windows | arm64 | anixops-${VERSION}-windows-arm64.zip |
+          | macOS | amd64 (Intel) | anixops-${VERSION}-darwin-amd64.tar.gz |
+          | macOS | arm64 (Apple Silicon) | anixops-${VERSION}-darwin-arm64.tar.gz |
+
+          ### 🔐 Verification
+
+          Verify downloads with checksums:
+          \`\`\`bash
+          sha256sum -c checksums.sha256
+          \`\`\`
+
+          ### 📝 Installation
+
+          **Linux/macOS:**
+          \`\`\`bash
+          tar -xzf anixops-${VERSION}-linux-amd64.tar.gz
+          sudo mv anixops /usr/local/bin/
+          \`\`\`
+
+          **Windows:**
+          Extract the zip file and add to PATH.
+
+          ### 📋 Changelog
+
+          See [CHANGELOG.md](./CHANGELOG.md) for details.
+
+          ---
+
+          **Full Changelog**: https://github.com/${{ github.repository }}/commits/${VERSION}
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: Release ${{ needs.version.outputs.version }}
+          body_path: release_notes.md
+          prerelease: ${{ needs.version.outputs.prerelease }}
+          draft: false
+          files: |
+            release/*.zip
+            release/*.tar.gz
+            release/checksums.*
+
+  # ============================================
+  # Update Version Branch
+  # ============================================
+  update-branch:
+    name: Update Version Branch
+    needs: [version, release]
+    if: needs.version.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create version branch
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          BRANCH_NAME="${VERSION}"
+
+          # Check if branch exists
+          if git show-ref --verify --quiet "refs/heads/${BRANCH_NAME}"; then
+            echo "Branch ${BRANCH_NAME} already exists"
+          else
+            # Create protected version branch
+            git checkout -b "${BRANCH_NAME}"
+            git push origin "${BRANCH_NAME}"
+            echo "Created version branch: ${BRANCH_NAME}"
+          fi
+
+      - name: Update CHANGELOG
+        run: |
+          VERSION="${{ needs.version.outputs.version }}"
+          DATE=$(date +%Y-%m-%d)
+
+          if [ -f CHANGELOG.md ]; then
+            # Prepend new version
+            sed -i "1i\\## [${VERSION}] - ${DATE}\\n\\n### Added\\n- Release ${VERSION}\\n\\n### Changed\\n\\n### Fixed\\n\\n" CHANGELOG.md
+          else
+            echo "# Changelog\\n\\n## [${VERSION}] - ${DATE}\\n\\n### Added\\n- Initial release\\n" > CHANGELOG.md
+          fi
+
+          git add CHANGELOG.md
+          git commit -m "docs: update changelog for ${VERSION}" || true
+          git push origin HEAD:production || true
