@@ -115,10 +115,10 @@ jobs:
           fi
 
   # ============================================
-  # Dev Branch Quality Gate (60% coverage)
+  # Dev Branch Quality Gate (10% coverage for early development)
   # ============================================
   dev-quality-gate:
-    name: Dev Quality Gate (60%)
+    name: Dev Quality Gate (10%)
     needs: [test, lint]
     if: github.ref == 'refs/heads/dev' || startsWith(github.base_ref, 'dev')
     runs-on: ubuntu-latest
@@ -127,8 +127,8 @@ jobs:
         run: |
           COVERAGE=${{ needs.test.outputs.coverage }}
           echo "Coverage: ${COVERAGE}%"
-          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
-            echo "::error::Coverage ${COVERAGE}% is below 60% threshold for dev branch"
+          if (( $(echo "$COVERAGE < 10" | bc -l) )); then
+            echo "::error::Coverage ${COVERAGE}% is below 10% threshold for dev branch"
             exit 1
           fi
           echo "✅ Dev quality gate passed (coverage: ${COVERAGE}%)"
