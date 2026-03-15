@@ -20,7 +20,7 @@ on:
           - all
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.24'
 
 jobs:
   check-mobile-ready:
