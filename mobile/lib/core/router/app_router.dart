@@ -67,7 +67,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/logs',
             name: 'logs',
-            builder: (context, state) => const LogsPage(),
+            builder: (context, state) => LogsPage(),
           ),
           GoRoute(
             path: '/settings',

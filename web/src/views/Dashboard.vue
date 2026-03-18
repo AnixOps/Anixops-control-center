@@ -1,179 +1,309 @@
 <template>
   <div class="space-y-6">
+    <!-- Header -->
     <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold text-white">Dashboard</h1>
-      <button
-        @click="refresh"
-        class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg transition-colors"
-      >
-        Refresh
-      </button>
+      <div>
+        <h1 class="text-2xl font-bold text-white">{{ t('dashboard.title') }}</h1>
+        <p class="text-dark-400 text-sm mt-1">{{ t('dashboard.subtitle') }}</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2 text-sm">
+          <span
+            class="w-2 h-2 rounded-full"
+            :class="connected ? 'bg-green-400 animate-pulse' : 'bg-red-400'"
+          />
+          <span class="text-dark-400">{{ connected ? t('dashboard.connected') : t('dashboard.disconnected') }}</span>
+        </div>
+        <button
+          @click="refresh"
+          :disabled="loading"
+          class="px-4 py-2 bg-dark-700 hover:bg-dark-600 text-white rounded-lg transition-colors flex items-center gap-2"
+        >
+          <ArrowPathIcon :class="{ 'animate-spin': loading }" class="w-4 h-4" />
+          {{ t('common.refresh') }}
+        </button>
+      </div>
     </div>
 
     <!-- Stats Cards -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <div
-        v-for="stat in stats"
+      <StatCard
+        v-for="stat in statCards"
         :key="stat.title"
-        class="bg-dark-800 rounded-xl p-6 border border-dark-700"
-      >
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-dark-400 text-sm">{{ stat.title }}</p>
-            <p class="text-2xl font-bold text-white mt-1">{{ stat.value }}</p>
-          </div>
-          <div
-            class="w-12 h-12 rounded-lg flex items-center justify-center"
-            :class="stat.color"
+        :title="stat.title"
+        :value="stat.value"
+        :change="stat.change"
+        :icon="stat.icon"
+        :color="stat.color"
+        :loading="loading"
+      />
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Traffic Chart -->
+      <div class="bg-dark-800 rounded-xl p-6 border border-dark-700">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white">{{ t('dashboard.trafficOverview') }}</h2>
+          <select
+            v-model="trafficPeriod"
+            @change="fetchTraffic(trafficPeriod)"
+            class="bg-dark-700 text-white text-sm rounded-lg px-3 py-1.5 border border-dark-600"
           >
-            <component :is="stat.icon" class="w-6 h-6 text-white" />
-          </div>
+            <option value="24h">24 Hours</option>
+            <option value="7d">7 Days</option>
+            <option value="30d">30 Days</option>
+          </select>
         </div>
-        <div v-if="stat.change" class="mt-2">
-          <span
-            :class="stat.change > 0 ? 'text-green-400' : 'text-red-400'"
-            class="text-sm"
-          >
-            {{ stat.change > 0 ? '↑' : '↓' }} {{ Math.abs(stat.change) }}%
-          </span>
-          <span class="text-dark-500 text-sm ml-1">vs last week</span>
+        <LineChart
+          v-if="trafficData.length > 0"
+          :data="trafficData"
+          :height="250"
+        />
+        <div v-else class="h-[250px] flex items-center justify-center text-dark-400">
+          <span v-if="loading">{{ t('common.loading') }}</span>
+          <span v-else>{{ t('common.noData') }}</span>
+        </div>
+      </div>
+
+      <!-- System Metrics -->
+      <div class="bg-dark-800 rounded-xl p-6 border border-dark-700">
+        <h2 class="text-lg font-semibold text-white mb-4">{{ t('dashboard.systemMetrics') }}</h2>
+        <div class="space-y-4">
+          <MetricBar
+            :label="t('dashboard.cpuUsage')"
+            :value="systemMetrics.cpu"
+            :max="100"
+            color="bg-blue-500"
+          />
+          <MetricBar
+            :label="t('dashboard.memory')"
+            :value="systemMetrics.memory"
+            :max="100"
+            color="bg-green-500"
+          />
+          <MetricBar
+            :label="t('dashboard.disk')"
+            :value="systemMetrics.disk"
+            :max="100"
+            color="bg-purple-500"
+          />
+          <MetricBar
+            :label="t('dashboard.network')"
+            :value="systemMetrics.network"
+            :max="100"
+            color="bg-orange-500"
+          />
         </div>
       </div>
     </div>
 
     <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Infrastructure Status -->
       <div class="bg-dark-800 rounded-xl p-6 border border-dark-700">
-        <h2 class="text-lg font-semibold text-white mb-4">Infrastructure</h2>
+        <h2 class="text-lg font-semibold text-white mb-4">{{ t('dashboard.infrastructure') }}</h2>
         <div class="space-y-3">
-          <div
+          <ServiceItem
             v-for="service in services"
             :key="service.name"
-            class="flex items-center justify-between p-3 bg-dark-700/50 rounded-lg"
-          >
-            <div class="flex items-center gap-3">
-              <div
-                class="w-2 h-2 rounded-full"
-                :class="service.status === 'online' ? 'bg-green-400' : 'bg-red-400'"
-              />
-              <span class="text-white">{{ service.name }}</span>
-            </div>
-            <div class="text-right">
-              <span class="text-dark-400">{{ service.count }}</span>
-            </div>
-          </div>
+            :name="service.name"
+            :status="service.status"
+            :count="service.count"
+          />
         </div>
       </div>
 
       <!-- Recent Activity -->
-      <div class="bg-dark-800 rounded-xl p-6 border border-dark-700">
-        <h2 class="text-lg font-semibold text-white mb-4">Recent Activity</h2>
-        <div class="space-y-3">
-          <div
+      <div class="lg:col-span-2 bg-dark-800 rounded-xl p-6 border border-dark-700">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white">{{ t('dashboard.recentActivity') }}</h2>
+          <router-link to="/logs" class="text-primary-400 text-sm hover:underline">
+            {{ t('common.details') }} →
+          </router-link>
+        </div>
+        <div class="space-y-3 max-h-[400px] overflow-y-auto">
+          <ActivityItem
             v-for="activity in activities"
             :key="activity.id"
-            class="flex items-start gap-3 p-3 bg-dark-700/50 rounded-lg"
-          >
-            <div
-              class="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
-              :class="getActivityColor(activity.type)"
-            >
-              <component :is="getActivityIcon(activity.type)" class="w-4 h-4" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-white text-sm">{{ activity.message }}</p>
-              <p class="text-dark-500 text-xs mt-1">{{ activity.time }}</p>
-            </div>
-          </div>
+            :activity="activity"
+          />
         </div>
       </div>
     </div>
 
-    <!-- Quick Actions -->
+    <!-- Quick Actions & Alerts -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Quick Actions -->
+      <div class="bg-dark-800 rounded-xl p-6 border border-dark-700">
+        <h2 class="text-lg font-semibold text-white mb-4">{{ t('dashboard.quickActions') }}</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <QuickAction
+            v-for="action in quickActions"
+            :key="action.name"
+            :name="action.name"
+            :icon="action.icon"
+            :color="action.color"
+            @click="handleAction(action.action)"
+          />
+        </div>
+      </div>
+
+      <!-- Active Alerts -->
+      <div class="bg-dark-800 rounded-xl p-6 border border-dark-700">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-white">{{ t('dashboard.activeAlerts') }}</h2>
+          <span
+            v-if="alerts.length > 0"
+            class="px-2 py-1 bg-red-500/20 text-red-400 text-xs rounded-full"
+          >
+            {{ alerts.length }}
+          </span>
+        </div>
+        <div v-if="alerts.length > 0" class="space-y-3">
+          <AlertItem
+            v-for="alert in alerts.slice(0, 5)"
+            :key="alert.id"
+            :alert="alert"
+            @dismiss="dismissAlert(alert.id)"
+          />
+        </div>
+        <div v-else class="py-8 text-center text-dark-400">
+          <CheckCircleIcon class="w-12 h-12 mx-auto mb-2 text-green-400" />
+          <p>{{ t('dashboard.noAlerts') }}</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Plugins Status -->
     <div class="bg-dark-800 rounded-xl p-6 border border-dark-700">
-      <h2 class="text-lg font-semibold text-white mb-4">Quick Actions</h2>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <button
-          v-for="action in quickActions"
-          :key="action.name"
-          @click="handleAction(action.action)"
-          class="flex flex-col items-center gap-2 p-4 bg-dark-700 hover:bg-dark-600 rounded-lg transition-colors"
-        >
-          <component :is="action.icon" class="w-6 h-6 text-primary-400" />
-          <span class="text-sm text-white">{{ action.name }}</span>
-        </button>
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-white">{{ t('plugins.title') }}</h2>
+        <router-link to="/plugins" class="text-primary-400 text-sm hover:underline">
+          {{ t('common.details') }} →
+        </router-link>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <PluginCard
+          v-for="plugin in plugins"
+          :key="plugin.name"
+          :plugin="plugin"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
+  ArrowPathIcon,
+  CheckCircleIcon,
   ServerIcon,
   UsersIcon,
   ComputerDesktopIcon,
   ChartBarIcon,
-  CheckCircleIcon,
-  XCircleIcon,
-  ClockIcon,
-  BoltIcon,
   DocumentTextIcon
 } from '@heroicons/vue/24/outline'
 
+import { useDashboardStore } from '@/stores/dashboard'
+import { usePluginsStore } from '@/stores/plugins'
+import { useWebSocket, WSEvents } from '@/services/websocket'
+
+import StatCard from '@/components/dashboard/StatCard.vue'
+import MetricBar from '@/components/dashboard/MetricBar.vue'
+import ServiceItem from '@/components/dashboard/ServiceItem.vue'
+import ActivityItem from '@/components/dashboard/ActivityItem.vue'
+import QuickAction from '@/components/dashboard/QuickAction.vue'
+import AlertItem from '@/components/dashboard/AlertItem.vue'
+import PluginCard from '@/components/dashboard/PluginCard.vue'
+import LineChart from '@/components/charts/LineChart.vue'
+
+const { t } = useI18n()
 const router = useRouter()
+const dashboardStore = useDashboardStore()
+const pluginsStore = usePluginsStore()
+const { connected, subscribe, connect } = useWebSocket()
 
-const stats = ref([
-  { title: 'Total Nodes', value: '8', change: 0, icon: ServerIcon, color: 'bg-blue-600' },
-  { title: 'Active Users', value: '357', change: 12, icon: UsersIcon, color: 'bg-green-600' },
-  { title: 'Online Agents', value: '4', change: 0, icon: ComputerDesktopIcon, color: 'bg-purple-600' },
-  { title: 'Traffic Today', value: '1.2TB', change: -5, icon: ChartBarIcon, color: 'bg-orange-600' }
-])
+// State
+const loading = ref(false)
+const trafficPeriod = ref('24h')
+const systemMetrics = ref({
+  cpu: 45,
+  memory: 67,
+  disk: 78,
+  network: 23
+})
 
-const services = ref([
-  { name: 'Panel', status: 'online', count: 'Running' },
-  { name: 'Nodes', status: 'online', count: '8 / 8' },
-  { name: 'Agents', status: 'online', count: '4 / 4' },
-  { name: 'Monitoring', status: 'offline', count: 'Disabled' }
-])
+// Computed
+const stats = computed(() => dashboardStore.stats)
+const activities = computed(() => dashboardStore.activities)
+const alerts = computed(() => dashboardStore.alerts)
+const trafficData = computed(() => dashboardStore.traffic)
+const plugins = computed(() => pluginsStore.plugins.slice(0, 4))
 
-const activities = ref([
-  { id: 1, type: 'deploy', message: 'Node tokyo-01 deployed successfully', time: '2 minutes ago' },
-  { id: 2, type: 'user', message: 'User admin logged in', time: '15 minutes ago' },
-  { id: 3, type: 'backup', message: 'Database backup completed', time: '1 hour ago' },
-  { id: 4, type: 'alert', message: 'Certificate expires in 7 days', time: '2 hours ago' },
-  { id: 5, type: 'error', message: 'Agent cache-01 connection failed', time: '3 hours ago' }
-])
-
-const quickActions = ref([
-  { name: 'Deploy Node', action: 'deploy', icon: ServerIcon },
-  { name: 'Manage Users', action: 'users', icon: UsersIcon },
-  { name: 'Run Playbook', action: 'playbook', icon: DocumentTextIcon },
-  { name: 'View Logs', action: 'logs', icon: ChartBarIcon }
-])
-
-function getActivityColor(type) {
-  const colors = {
-    deploy: 'bg-green-600',
-    user: 'bg-blue-600',
-    backup: 'bg-purple-600',
-    alert: 'bg-yellow-600',
-    error: 'bg-red-600'
+const statCards = computed(() => [
+  {
+    title: t('dashboard.totalNodes'),
+    value: stats.value.nodes.total.toString(),
+    change: 0,
+    icon: ServerIcon,
+    color: 'bg-blue-600'
+  },
+  {
+    title: t('dashboard.activeUsers'),
+    value: stats.value.users.active.toString(),
+    change: 12,
+    icon: UsersIcon,
+    color: 'bg-green-600'
+  },
+  {
+    title: t('dashboard.onlineAgents'),
+    value: stats.value.agents.online.toString(),
+    change: 0,
+    icon: ComputerDesktopIcon,
+    color: 'bg-purple-600'
+  },
+  {
+    title: t('dashboard.trafficToday'),
+    value: formatBytes(stats.value.traffic.today),
+    change: -5,
+    icon: ChartBarIcon,
+    color: 'bg-orange-600'
   }
-  return colors[type] || 'bg-gray-600'
+])
+
+const services = computed(() => [
+  { name: 'Panel', status: 'online', count: t('common.running') },
+  { name: t('navigation.nodes'), status: stats.value.nodes.offline > 0 ? 'degraded' : 'online', count: `${stats.value.nodes.online} / ${stats.value.nodes.total}` },
+  { name: t('navigation.agents'), status: stats.value.agents.online > 0 ? 'online' : 'offline', count: `${stats.value.agents.online} / ${stats.value.agents.total}` },
+  { name: t('navigation.plugins'), status: stats.value.plugins.active > 0 ? 'online' : 'offline', count: `${stats.value.plugins.active} / ${stats.value.plugins.total}` }
+])
+
+const quickActions = computed(() => [
+  { name: t('dashboard.deployNode'), action: 'deploy', icon: ServerIcon, color: 'bg-blue-500' },
+  { name: t('dashboard.manageUsers'), action: 'users', icon: UsersIcon, color: 'bg-green-500' },
+  { name: t('dashboard.runPlaybook'), action: 'playbook', icon: DocumentTextIcon, color: 'bg-purple-500' },
+  { name: t('dashboard.viewLogs'), action: 'logs', icon: ChartBarIcon, color: 'bg-orange-500' }
+])
+
+// Methods
+async function refresh() {
+  loading.value = true
+  try {
+    await Promise.all([
+      dashboardStore.fetchAll(),
+      pluginsStore.fetchPlugins()
+    ])
+  } finally {
+    loading.value = false
+  }
 }
 
-function getActivityIcon(type) {
-  const icons = {
-    deploy: CheckCircleIcon,
-    user: UsersIcon,
-    backup: ClockIcon,
-    alert: BoltIcon,
-    error: XCircleIcon
-  }
-  return icons[type] || ClockIcon
+function fetchTraffic(period) {
+  dashboardStore.fetchTraffic(period)
 }
 
 function handleAction(action) {
@@ -186,11 +316,55 @@ function handleAction(action) {
   router.push(routes[action])
 }
 
-function refresh() {
-  // TODO: Implement refresh
+function dismissAlert(id) {
+  dashboardStore.removeAlert(id)
 }
 
-onMounted(() => {
-  // TODO: Fetch data from API
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+// WebSocket subscriptions
+let unsubscribers = []
+
+onMounted(async () => {
+  await refresh()
+
+  // Connect WebSocket
+  const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/api/v1/ws`
+  connect(wsUrl)
+
+  // Subscribe to events
+  unsubscribers.push(
+    subscribe(WSEvents.SYSTEM_METRICS, (data) => {
+      systemMetrics.value = data
+    })
+  )
+
+  unsubscribers.push(
+    subscribe(WSEvents.ACTIVITY, (activity) => {
+      dashboardStore.addActivity(activity)
+    })
+  )
+
+  unsubscribers.push(
+    subscribe(WSEvents.ALERT_CREATED, (alert) => {
+      dashboardStore.addAlert(alert)
+    })
+  )
+
+  unsubscribers.push(
+    subscribe(WSEvents.NODE_STATUS, (data) => {
+      // Update node stats in real-time
+    })
+  )
+})
+
+onUnmounted(() => {
+  unsubscribers.forEach(unsub => unsub())
 })
 </script>
