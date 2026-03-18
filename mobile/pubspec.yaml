@@ -42,7 +42,7 @@ dependencies:
   fl_chart: ^0.66.0
 
   # Utils
-  intl: ^0.20.2
+  intl: any
   timeago: ^3.6.0
   url_launcher: ^6.2.0
   package_info_plus: ^9.0.0
