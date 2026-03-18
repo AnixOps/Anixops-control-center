@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/nodes/presentation/pages/nodes_page.dart';
 import '../../features/plugins/presentation/pages/plugins_page.dart';
@@ -22,7 +23,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/dashboard',
     redirect: (context, state) {
       final isAuthenticated = authState.isAuthenticated;
-      final isAuthRoute = state.matchedLocation == '/login';
+      final isAuthRoute = state.matchedLocation == '/login' || state.matchedLocation == '/register';
 
       if (!isAuthenticated && !isAuthRoute) {
         return '/login';
@@ -40,6 +41,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         name: 'login',
         builder: (context, state) => _buildLoginShell(const LoginPage()),
+      ),
+      GoRoute(
+        path: '/register',
+        name: 'register',
+        builder: (context, state) => _buildLoginShell(const RegisterPage()),
       ),
 
       // Main app shell - different layout for desktop vs mobile

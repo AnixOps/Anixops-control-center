@@ -4,30 +4,40 @@ import 'package:go_router/go_router.dart';
 import 'package:anixops_mobile/core/theme/app_theme.dart';
 import 'package:anixops_mobile/features/auth/presentation/providers/auth_provider.dart';
 
-class LoginPage extends ConsumerStatefulWidget {
-  const LoginPage({super.key});
+class RegisterPage extends ConsumerStatefulWidget {
+  const RegisterPage({super.key});
 
   @override
-  ConsumerState<LoginPage> createState() => _LoginPageState();
+  ConsumerState<RegisterPage> createState() => _RegisterPageState();
 }
 
-class _LoginPageState extends ConsumerState<LoginPage> {
+class _RegisterPageState extends ConsumerState<RegisterPage> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'test@example.com');
-  final _passwordController = TextEditingController(text: 'test123456');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
+  bool _agreedToTerms = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_agreedToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please agree to the Terms of Service')),
+      );
+      return;
+    }
 
-    final success = await ref.read(authStateProvider.notifier).login(
+    final success = await ref.read(authStateProvider.notifier).register(
           _emailController.text.trim(),
           _passwordController.text,
         );
@@ -63,31 +73,23 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(
-                      Icons.dashboard_rounded,
+                      Icons.person_add_rounded,
                       size: 40,
                       color: Colors.white,
                     ),
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'AnixOps',
+                    'Create Account',
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: AppTheme.darkText,
                         ),
                     textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Control Center',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppTheme.darkTextSecondary,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
                   const SizedBox(height: 8),
                   Text(
-                    'Sign in to continue',
+                    'Sign up to get started',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: AppTheme.darkTextSecondary,
                         ),
@@ -106,19 +108,12 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(
-                            Icons.error_outline,
-                            color: AppTheme.errorColor,
-                            size: 20,
-                          ),
+                          const Icon(Icons.error_outline, color: AppTheme.errorColor, size: 20),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               authState.error!,
-                              style: const TextStyle(
-                                color: AppTheme.errorColor,
-                                fontSize: 14,
-                              ),
+                              style: const TextStyle(color: AppTheme.errorColor, fontSize: 14),
                             ),
                           ),
                         ],
@@ -168,8 +163,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _login(),
+                    textInputAction: TextInputAction.next,
                     style: const TextStyle(color: AppTheme.darkText),
                     decoration: InputDecoration(
                       labelText: 'Password',
@@ -205,17 +199,94 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your password';
                       }
-                      if (value.length < 6) {
-                        return 'Password must be at least 6 characters';
+                      if (value.length < 8) {
+                        return 'Password must be at least 8 characters';
                       }
                       return null;
                     },
                   ),
+                  const SizedBox(height: 16),
+
+                  // Confirm Password field
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: _obscureConfirmPassword,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _register(),
+                    style: const TextStyle(color: AppTheme.darkText),
+                    decoration: InputDecoration(
+                      labelText: 'Confirm Password',
+                      labelStyle: const TextStyle(color: AppTheme.darkTextSecondary),
+                      prefixIcon: const Icon(Icons.lock_outlined, color: AppTheme.darkTextSecondary),
+                      filled: true,
+                      fillColor: AppTheme.darkSurface,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppTheme.darkBorder),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppTheme.darkBorder),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppTheme.primaryColor),
+                      ),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscureConfirmPassword ? Icons.visibility : Icons.visibility_off,
+                          color: AppTheme.darkTextSecondary,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscureConfirmPassword = !_obscureConfirmPassword;
+                          });
+                        },
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please confirm your password';
+                      }
+                      if (value != _passwordController.text) {
+                        return 'Passwords do not match';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Terms checkbox
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _agreedToTerms,
+                        onChanged: (value) {
+                          setState(() {
+                            _agreedToTerms = value ?? false;
+                          });
+                        },
+                        activeColor: AppTheme.primaryColor,
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => context.push('/terms'),
+                          child: Text(
+                            'I agree to the Terms of Service and Privacy Policy',
+                            style: TextStyle(
+                              color: AppTheme.darkTextSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 24),
 
-                  // Login button
+                  // Register button
                   ElevatedButton(
-                    onPressed: authState.isLoading ? null : _login,
+                    onPressed: authState.isLoading ? null : _register,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppTheme.primaryColor,
                       foregroundColor: Colors.white,
@@ -228,62 +299,28 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                         ? const SizedBox(
                             height: 20,
                             width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
                         : const Text(
-                            'Sign In',
+                            'Create Account',
                             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                           ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Register link
+                  // Login link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "Don't have an account? ",
+                        'Already have an account? ',
                         style: TextStyle(color: AppTheme.darkTextSecondary),
                       ),
                       TextButton(
-                        onPressed: () => context.go('/register'),
-                        child: const Text('Sign Up'),
+                        onPressed: () => context.go('/login'),
+                        child: const Text('Sign In'),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Server status
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.darkSurface,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.darkBorder),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: AppTheme.successColor,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          'Connected to api.anixops.com',
-                          style: TextStyle(
-                            color: AppTheme.darkTextSecondary,
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ],
               ),

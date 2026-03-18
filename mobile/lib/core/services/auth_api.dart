@@ -14,6 +14,15 @@ class AuthApi {
     });
   }
 
+  /// Register new user
+  Future<Response> register(String email, String password, {String role = 'viewer'}) async {
+    return _dio.post('/auth/register', data: {
+      'email': email,
+      'password': password,
+      'role': role,
+    });
+  }
+
   /// Logout current user
   Future<Response> logout() async {
     return _dio.post('/auth/logout');

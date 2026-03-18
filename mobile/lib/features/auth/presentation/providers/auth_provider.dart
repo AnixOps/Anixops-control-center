@@ -180,6 +180,32 @@ class AuthNotifier extends StateNotifier<AuthState> {
       return false;
     }
   }
+
+  Future<bool> register(String email, String password) async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      final response = await _apiClient.auth.register(email, password);
+
+      if (response.data['success'] == true) {
+        // Registration successful, now login
+        return await login(email, password);
+      } else {
+        state = state.copyWith(
+          isLoading: false,
+          error: response.data['error'] ?? 'Registration failed',
+        );
+        return false;
+      }
+    } on DioException catch (e) {
+      final error = e.response?.data?['error'] ?? 'Network error';
+      state = state.copyWith(isLoading: false, error: error);
+      return false;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+      return false;
+    }
+  }
 }
 
 // Provider for SharedPreferences
