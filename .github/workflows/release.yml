@@ -74,7 +74,7 @@ jobs:
           storePassword=$ANDROID_STORE_PASSWORD
           keyPassword=$ANDROID_KEY_PASSWORD
           keyAlias=$ANDROID_KEY_ALIAS
-          storeFile=keystore/anixops-release.jks
+          storeFile=../keystore/anixops-release.jks
           EOF
           flutter build apk --release --shrink
 
