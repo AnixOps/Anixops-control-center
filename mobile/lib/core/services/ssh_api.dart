@@ -6,23 +6,44 @@ class SshApi {
 
   SshApi(this._dio);
 
-  /// Test SSH connection with password
+  /// Test SSH connection
+  Future<Response> testConnection({
+    required String host,
+    required int port,
+    required String username,
+    required String authType,
+    String? password,
+    String? privateKey,
+    String? passphrase,
+  }) async {
+    return _dio.post('/ssh/test', data: {
+      'host': host,
+      'port': port,
+      'username': username,
+      'auth_type': authType,
+      if (password != null) 'password': password,
+      if (privateKey != null) 'private_key': privateKey,
+      if (passphrase != null) 'passphrase': passphrase,
+    });
+  }
+
+  /// Test SSH connection with password (convenience method)
   Future<Response> testConnectionWithPassword({
     required String host,
     required int port,
     required String username,
     required String password,
   }) async {
-    return _dio.post('/ssh/test', data: {
-      'host': host,
-      'port': port,
-      'username': username,
-      'auth_type': 'password',
-      'password': password,
-    });
+    return testConnection(
+      host: host,
+      port: port,
+      username: username,
+      authType: 'password',
+      password: password,
+    );
   }
 
-  /// Test SSH connection with private key
+  /// Test SSH connection with private key (convenience method)
   Future<Response> testConnectionWithKey({
     required String host,
     required int port,
@@ -30,14 +51,14 @@ class SshApi {
     required String privateKey,
     String? passphrase,
   }) async {
-    return _dio.post('/ssh/test', data: {
-      'host': host,
-      'port': port,
-      'username': username,
-      'auth_type': 'key',
-      'private_key': privateKey,
-      'passphrase': passphrase,
-    });
+    return testConnection(
+      host: host,
+      port: port,
+      username: username,
+      authType: 'key',
+      privateKey: privateKey,
+      passphrase: passphrase,
+    );
   }
 
   /// Import server via SSH

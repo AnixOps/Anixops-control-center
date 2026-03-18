@@ -51,6 +51,17 @@ class AuthApi {
     });
   }
 
+  /// Update current user profile
+  Future<Response> updateProfile({
+    String? name,
+    String? email,
+  }) async {
+    return _dio.put('/users/me', data: {
+      if (name != null) 'name': name,
+      if (email != null) 'email': email,
+    });
+  }
+
   /// Request password reset email
   Future<Response> forgotPassword(String email) async {
     return _dio.post('/auth/forgot-password', data: {
@@ -67,5 +78,47 @@ class AuthApi {
       'token': token,
       'password': password,
     });
+  }
+}
+
+/// API Tokens API endpoints
+class TokensApi {
+  final Dio _dio;
+
+  TokensApi(this._dio);
+
+  /// List API tokens
+  Future<Response> list() async {
+    return _dio.get('/users/me/tokens');
+  }
+
+  /// Create API token
+  Future<Response> create(String name, {int? expiresInDays}) async {
+    return _dio.post('/users/me/tokens', data: {
+      'name': name,
+      if (expiresInDays != null) 'expires_in_days': expiresInDays,
+    });
+  }
+
+  /// Delete API token
+  Future<Response> delete(String id) async {
+    return _dio.delete('/users/me/tokens/$id');
+  }
+}
+
+/// Sessions API endpoints
+class SessionsApi {
+  final Dio _dio;
+
+  SessionsApi(this._dio);
+
+  /// List active sessions
+  Future<Response> list() async {
+    return _dio.get('/users/me/sessions');
+  }
+
+  /// Delete other sessions
+  Future<Response> deleteOthers() async {
+    return _dio.delete('/users/me/sessions/others');
   }
 }

@@ -64,8 +64,11 @@ class NodesApi {
   }
 
   /// Get node logs
-  Future<Response> logs(String id, {int limit = 100}) async {
-    return _dio.get('/nodes/$id/logs', queryParameters: {'limit': limit});
+  Future<Response> logs(String id, {int limit = 100, String? level}) async {
+    return _dio.get('/nodes/$id/logs', queryParameters: {
+      'limit': limit,
+      if (level != null) 'level': level,
+    });
   }
 
   /// Test node connection
@@ -76,5 +79,16 @@ class NodesApi {
   /// Sync node configuration
   Future<Response> sync(String id) async {
     return _dio.post('/nodes/$id/sync');
+  }
+
+  /// Bulk operations on nodes
+  Future<Response> bulkAction({
+    required List<String> nodeIds,
+    required String action, // start, stop, restart, delete
+  }) async {
+    return _dio.post('/nodes/bulk', data: {
+      'node_ids': nodeIds,
+      'action': action,
+    });
   }
 }

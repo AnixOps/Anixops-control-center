@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:anixops_mobile/core/theme/app_theme.dart';
+import 'package:anixops_mobile/core/services/api_client.dart';
 
 import '../providers/nodes_provider.dart';
 import 'import_server_dialog.dart';
@@ -60,7 +61,7 @@ class _NodesPageState extends ConsumerState<NodesPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: action == 'stop' ? Colors.red : AppTheme.primaryColor,
+              backgroundColor: action == 'stop' || action == 'delete' ? Colors.red : AppTheme.primaryColor,
             ),
             child: Text(action.toUpperCase()),
           ),
@@ -69,11 +70,33 @@ class _NodesPageState extends ConsumerState<NodesPage> {
     );
 
     if (confirmed == true) {
-      // TODO: Implement bulk action API call
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$action ${_selectedNodes.length} nodes...')),
-      );
-      _clearSelection();
+      try {
+        await apiClient.nodes.bulkAction(
+          nodeIds: _selectedNodes.toList(),
+          action: action,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$action ${_selectedNodes.length} nodes successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        _clearSelection();
+        // Refresh the list
+        ref.read(nodesProvider.notifier).refresh();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to $action: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
     }
   }
 

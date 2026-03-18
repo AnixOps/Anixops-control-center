@@ -13,6 +13,8 @@ class ApiClient {
   late final UsersApi users;
   late final PluginsApi plugins;
   late final SshApi ssh;
+  late final TokensApi tokens;
+  late final SessionsApi sessions;
 
   // Cloud API endpoint
   static const String defaultBaseUrl = 'https://api.anixops.com/api/v1';
@@ -58,6 +60,8 @@ class ApiClient {
     users = UsersApi(_dio);
     plugins = PluginsApi(_dio);
     ssh = SshApi(_dio);
+    tokens = TokensApi(_dio);
+    sessions = SessionsApi(_dio);
   }
 
   /// Update base URL

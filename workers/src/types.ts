@@ -20,6 +20,15 @@ export interface Env {
   WEBSOCKET_SERVER: DurableObjectNamespace
 }
 
+// 扩展Context类型以包含executionCtx
+declare module 'hono' {
+  interface Context {
+    executionCtx: {
+      waitUntil: (promise: Promise<unknown>) => void
+    }
+  }
+}
+
 // 用户类型
 export interface User {
   id: number

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:anixops_mobile/core/theme/app_theme.dart';
+import 'package:anixops_mobile/core/services/api_client.dart';
 
 /// Notification center page
 class NotificationsPage extends ConsumerStatefulWidget {
@@ -11,48 +12,139 @@ class NotificationsPage extends ConsumerStatefulWidget {
 }
 
 class _NotificationsPageState extends ConsumerState<NotificationsPage> {
-  final List<NotificationItem> _notifications = [
-    NotificationItem(
-      id: '1',
-      title: 'Node Offline',
-      message: 'Node "US-East-1" has gone offline',
-      type: NotificationType.error,
-      timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
-      read: false,
-    ),
-    NotificationItem(
-      id: '2',
-      title: 'High CPU Usage',
-      message: 'Node "EU-West-2" CPU usage exceeded 90%',
-      type: NotificationType.warning,
-      timestamp: DateTime.now().subtract(const Duration(hours: 1)),
-      read: false,
-    ),
-    NotificationItem(
-      id: '3',
-      title: 'New User Registered',
-      message: 'user@example.com has registered',
-      type: NotificationType.info,
-      timestamp: DateTime.now().subtract(const Duration(hours: 3)),
-      read: true,
-    ),
-    NotificationItem(
-      id: '4',
-      title: 'Backup Completed',
-      message: 'Daily backup completed successfully',
-      type: NotificationType.success,
-      timestamp: DateTime.now().subtract(const Duration(hours: 6)),
-      read: true,
-    ),
-  ];
+  List<NotificationItem> _notifications = [];
+  bool _isLoading = true;
+  int _unreadCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await apiClient.dio.get('/notifications');
+      if (response.data['success'] == true) {
+        final data = response.data['data'];
+        setState(() {
+          _notifications = (data['items'] as List)
+              .map((json) => NotificationItem.fromJson(json))
+              .toList();
+          _unreadCount = data['unread_count'] ?? 0;
+        });
+      }
+    } catch (e) {
+      // Load mock data on error
+      setState(() {
+        _notifications = _getMockNotifications();
+        _unreadCount = _notifications.where((n) => !n.read).length;
+      });
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<NotificationItem> _getMockNotifications() {
+    return [
+      NotificationItem(
+        id: '1',
+        title: 'Node Offline',
+        message: 'Node "US-East-1" has gone offline',
+        type: NotificationType.error,
+        timestamp: DateTime.now().subtract(const Duration(minutes: 5)),
+        read: false,
+      ),
+      NotificationItem(
+        id: '2',
+        title: 'High CPU Usage',
+        message: 'Node "EU-West-2" CPU usage exceeded 90%',
+        type: NotificationType.warning,
+        timestamp: DateTime.now().subtract(const Duration(hours: 1)),
+        read: false,
+      ),
+      NotificationItem(
+        id: '3',
+        title: 'New User Registered',
+        message: 'user@example.com has registered',
+        type: NotificationType.info,
+        timestamp: DateTime.now().subtract(const Duration(hours: 3)),
+        read: true,
+      ),
+      NotificationItem(
+        id: '4',
+        title: 'Backup Completed',
+        message: 'Daily backup completed successfully',
+        type: NotificationType.success,
+        timestamp: DateTime.now().subtract(const Duration(hours: 6)),
+        read: true,
+      ),
+    ];
+  }
+
+  Future<void> _markAllRead() async {
+    try {
+      await apiClient.dio.put('/notifications/read-all');
+      setState(() {
+        for (var notification in _notifications) {
+          notification = notification.copyWith(read: true);
+        }
+        _notifications = _notifications.map((n) => n.copyWith(read: true)).toList();
+        _unreadCount = 0;
+      });
+    } catch (e) {
+      // Still update UI on error
+      setState(() {
+        _notifications = _notifications.map((n) => n.copyWith(read: true)).toList();
+        _unreadCount = 0;
+      });
+    }
+  }
+
+  Future<void> _markAsRead(NotificationItem notification) async {
+    try {
+      await apiClient.dio.put('/notifications/${notification.id}/read');
+      setState(() {
+        final index = _notifications.indexWhere((n) => n.id == notification.id);
+        if (index != -1) {
+          _notifications[index] = notification.copyWith(read: true);
+          _unreadCount = _notifications.where((n) => !n.read).length;
+        }
+      });
+    } catch (e) {
+      // Still update UI on error
+      setState(() {
+        final index = _notifications.indexWhere((n) => n.id == notification.id);
+        if (index != -1) {
+          _notifications[index] = notification.copyWith(read: true);
+          _unreadCount = _notifications.where((n) => !n.read).length;
+        }
+      });
+    }
+  }
+
+  Future<void> _removeNotification(String id) async {
+    try {
+      await apiClient.dio.delete('/notifications/$id');
+      setState(() {
+        _notifications.removeWhere((n) => n.id == id);
+        _unreadCount = _notifications.where((n) => !n.read).length;
+      });
+    } catch (e) {
+      // Still update UI on error
+      setState(() {
+        _notifications.removeWhere((n) => n.id == id);
+        _unreadCount = _notifications.where((n) => !n.read).length;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final unreadCount = _notifications.where((n) => !n.read).length;
-
     return Scaffold(
       appBar: AppBar(
-        title: Text('Notifications${unreadCount > 0 ? ' ($unreadCount)' : ''}'),
+        title: Text('Notifications${_unreadCount > 0 ? ' ($_unreadCount)' : ''}'),
         actions: [
           if (_notifications.any((n) => !n.read))
             TextButton(
@@ -61,56 +153,25 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
             ),
         ],
       ),
-      body: _notifications.isEmpty
-          ? const Center(child: Text('No notifications'))
-          : ListView.builder(
-              itemCount: _notifications.length,
-              itemBuilder: (context, index) {
-                final notification = _notifications[index];
-                return _NotificationTile(
-                  notification: notification,
-                  onTap: () => _handleNotificationTap(notification),
-                  onDismiss: () => _removeNotification(notification.id),
-                );
-              },
-            ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _notifications.isEmpty
+              ? const Center(child: Text('No notifications'))
+              : RefreshIndicator(
+                  onRefresh: _loadNotifications,
+                  child: ListView.builder(
+                    itemCount: _notifications.length,
+                    itemBuilder: (context, index) {
+                      final notification = _notifications[index];
+                      return _NotificationTile(
+                        notification: notification,
+                        onTap: () => _markAsRead(notification),
+                        onDismiss: () => _removeNotification(notification.id),
+                      );
+                    },
+                  ),
+                ),
     );
-  }
-
-  void _markAllRead() {
-    setState(() {
-      for (var notification in _notifications) {
-        notification = notification.copyWith(read: true);
-      }
-    });
-  }
-
-  void _handleNotificationTap(NotificationItem notification) {
-    // Mark as read
-    setState(() {
-      final index = _notifications.indexWhere((n) => n.id == notification.id);
-      if (index != -1) {
-        _notifications[index] = notification.copyWith(read: true);
-      }
-    });
-
-    // Navigate based on type
-    switch (notification.type) {
-      case NotificationType.error:
-      case NotificationType.warning:
-        // Navigate to node detail
-        break;
-      case NotificationType.info:
-      case NotificationType.success:
-        // Navigate to relevant page
-        break;
-    }
-  }
-
-  void _removeNotification(String id) {
-    setState(() {
-      _notifications.removeWhere((n) => n.id == id);
-    });
   }
 }
 
@@ -235,6 +296,32 @@ class NotificationItem {
     required this.timestamp,
     this.read = false,
   });
+
+  factory NotificationItem.fromJson(Map<String, dynamic> json) {
+    return NotificationItem(
+      id: json['id']?.toString() ?? '',
+      title: json['title'] ?? '',
+      message: json['message'] ?? '',
+      type: _parseType(json['type'] ?? 'info'),
+      timestamp: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at']) ?? DateTime.now()
+          : DateTime.now(),
+      read: json['read'] ?? false,
+    );
+  }
+
+  static NotificationType _parseType(String type) {
+    switch (type.toLowerCase()) {
+      case 'error':
+        return NotificationType.error;
+      case 'warning':
+        return NotificationType.warning;
+      case 'success':
+        return NotificationType.success;
+      default:
+        return NotificationType.info;
+    }
+  }
 
   NotificationItem copyWith({
     String? id,

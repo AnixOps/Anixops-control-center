@@ -1,4 +1,4 @@
-import axios from 'axios'
+import 'package:dio/dio.dart';
 
 class ApiService {
   final Dio _dio;

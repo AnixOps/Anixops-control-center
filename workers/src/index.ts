@@ -7,12 +7,14 @@ import type { Env } from './types'
 // Handlers
 import { healthHandler, readinessHandler } from './handlers/health'
 import { loginHandler, registerHandler, refreshHandler, logoutHandler, meHandler } from './handlers/auth'
-import { listNodesHandler, getNodeHandler, createNodeHandler, updateNodeHandler, deleteNodeHandler } from './handlers/nodes'
+import { listNodesHandler, getNodeHandler, createNodeHandler, updateNodeHandler, deleteNodeHandler, startNodeHandler, stopNodeHandler, restartNodeHandler, getNodeStatsHandler, getNodeLogsHandler, testNodeConnectionHandler, syncNodeHandler, bulkActionHandler } from './handlers/nodes'
 import { listPlaybooksHandler, getPlaybookHandler, uploadPlaybookHandler, runPlaybookHandler } from './handlers/playbooks'
 import { listPluginsHandler, getPluginHandler, executePluginHandler } from './handlers/plugins'
 import { dashboardHandler, statsHandler } from './handlers/dashboard'
 import { listAuditLogsHandler } from './handlers/audit'
-import { listUsersHandler, getUserHandler, createUserHandler, updateUserHandler, deleteUserHandler } from './handlers/users'
+import { listUsersHandler, getUserHandler, createUserHandler, updateUserHandler, deleteUserHandler, changePasswordHandler, getCurrentUserHandler, updateCurrentUserHandler, listApiTokensHandler, createApiTokenHandler, deleteApiTokenHandler, listSessionsHandler, deleteOtherSessionsHandler } from './handlers/users'
+import { testConnectionHandler, importServerHandler, detectServerTypeHandler } from './handlers/ssh'
+import { listNotificationsHandler, markNotificationReadHandler, markAllNotificationsReadHandler, deleteNotificationHandler, createNotificationHandler, getUnreadCountHandler } from './handlers/notifications'
 
 // Middleware
 import { authMiddleware, rbacMiddleware } from './middleware/auth'
@@ -58,7 +60,18 @@ app.post('/api/v1/auth/logout', logoutHandler)
 // ==================== 受保护路由 ====================
 
 // 用户信息
-app.get('/api/v1/users/me', authMiddleware, meHandler)
+app.get('/api/v1/users/me', authMiddleware, getCurrentUserHandler)
+app.put('/api/v1/users/me', authMiddleware, updateCurrentUserHandler)
+app.put('/api/v1/auth/password', authMiddleware, changePasswordHandler)
+
+// API Tokens
+app.get('/api/v1/users/me/tokens', authMiddleware, listApiTokensHandler)
+app.post('/api/v1/users/me/tokens', authMiddleware, createApiTokenHandler)
+app.delete('/api/v1/users/me/tokens/:id', authMiddleware, deleteApiTokenHandler)
+
+// Sessions
+app.get('/api/v1/users/me/sessions', authMiddleware, listSessionsHandler)
+app.delete('/api/v1/users/me/sessions/others', authMiddleware, deleteOtherSessionsHandler)
 
 // 用户管理 (需要管理员权限)
 app.get('/api/v1/users', authMiddleware, rbacMiddleware(['admin']), listUsersHandler)
@@ -67,10 +80,23 @@ app.post('/api/v1/users', authMiddleware, rbacMiddleware(['admin']), createUserH
 app.put('/api/v1/users/:id', authMiddleware, rbacMiddleware(['admin']), updateUserHandler)
 app.delete('/api/v1/users/:id', authMiddleware, rbacMiddleware(['admin']), deleteUserHandler)
 
+// SSH导入
+app.post('/api/v1/ssh/test', authMiddleware, rbacMiddleware(['admin', 'operator']), testConnectionHandler)
+app.post('/api/v1/ssh/import', authMiddleware, rbacMiddleware(['admin', 'operator']), importServerHandler)
+app.post('/api/v1/ssh/detect', authMiddleware, rbacMiddleware(['admin', 'operator']), detectServerTypeHandler)
+
 // 节点管理
 app.get('/api/v1/nodes', authMiddleware, listNodesHandler)
 app.get('/api/v1/nodes/:id', authMiddleware, getNodeHandler)
+app.get('/api/v1/nodes/:id/stats', authMiddleware, getNodeStatsHandler)
+app.get('/api/v1/nodes/:id/logs', authMiddleware, getNodeLogsHandler)
 app.post('/api/v1/nodes', authMiddleware, rbacMiddleware(['admin', 'operator']), createNodeHandler)
+app.post('/api/v1/nodes/bulk', authMiddleware, rbacMiddleware(['admin', 'operator']), bulkActionHandler)
+app.post('/api/v1/nodes/:id/start', authMiddleware, rbacMiddleware(['admin', 'operator']), startNodeHandler)
+app.post('/api/v1/nodes/:id/stop', authMiddleware, rbacMiddleware(['admin', 'operator']), stopNodeHandler)
+app.post('/api/v1/nodes/:id/restart', authMiddleware, rbacMiddleware(['admin', 'operator']), restartNodeHandler)
+app.post('/api/v1/nodes/:id/test', authMiddleware, testNodeConnectionHandler)
+app.post('/api/v1/nodes/:id/sync', authMiddleware, rbacMiddleware(['admin', 'operator']), syncNodeHandler)
 app.put('/api/v1/nodes/:id', authMiddleware, rbacMiddleware(['admin', 'operator']), updateNodeHandler)
 app.delete('/api/v1/nodes/:id', authMiddleware, rbacMiddleware(['admin']), deleteNodeHandler)
 
@@ -91,6 +117,14 @@ app.get('/api/v1/dashboard/stats', authMiddleware, statsHandler)
 
 // 审计日志
 app.get('/api/v1/audit-logs', authMiddleware, rbacMiddleware(['admin']), listAuditLogsHandler)
+
+// 通知管理
+app.get('/api/v1/notifications', authMiddleware, listNotificationsHandler)
+app.get('/api/v1/notifications/unread-count', authMiddleware, getUnreadCountHandler)
+app.post('/api/v1/notifications', authMiddleware, rbacMiddleware(['admin', 'operator']), createNotificationHandler)
+app.put('/api/v1/notifications/:id/read', authMiddleware, markNotificationReadHandler)
+app.put('/api/v1/notifications/read-all', authMiddleware, markAllNotificationsReadHandler)
+app.delete('/api/v1/notifications/:id', authMiddleware, deleteNotificationHandler)
 
 // ==================== WebSocket ====================
 

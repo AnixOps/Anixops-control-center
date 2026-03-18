@@ -564,15 +564,35 @@ class APIKeysDialog extends ConsumerStatefulWidget {
 
 class _APIKeysDialogState extends ConsumerState<APIKeysDialog> {
   final _keyNameController = TextEditingController();
-  List<Map<String, dynamic>> _apiKeys = [
-    {'name': 'CI/CD Pipeline', 'created': '2024-01-15', 'lastUsed': '2024-03-18'},
-    {'name': 'Mobile App', 'created': '2024-02-20', 'lastUsed': '2024-03-17'},
-  ];
+  List<Map<String, dynamic>> _apiKeys = [];
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadApiKeys();
+  }
 
   @override
   void dispose() {
     _keyNameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadApiKeys() async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await apiClient.tokens.list();
+      if (response.data['success'] == true) {
+        setState(() {
+          _apiKeys = List<Map<String, dynamic>>.from(response.data['data'] ?? []);
+        });
+      }
+    } catch (e) {
+      // Ignore errors
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -584,35 +604,40 @@ class _APIKeysDialogState extends ConsumerState<APIKeysDialog> {
           const Spacer(),
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () => _showCreateKeyDialog(),
+            onPressed: _isLoading ? null : () => _showCreateKeyDialog(),
           ),
         ],
       ),
       content: SizedBox(
         width: 400,
-        child: _apiKeys.isEmpty
-            ? const Center(
-                child: Text('No API keys created'),
-              )
-            : ListView.builder(
-                shrinkWrap: true,
-                itemCount: _apiKeys.length,
-                itemBuilder: (context, index) {
-                  final key = _apiKeys[index];
-                  return Card(
-                    child: ListTile(
-                      leading: const Icon(Icons.vpn_key),
-                      title: Text(key['name']),
-                      subtitle: Text('Created: ${key['created']}\nLast used: ${key['lastUsed']}'),
-                      isThreeLine: true,
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => _deleteKey(index),
-                      ),
-                    ),
-                  );
-                },
-              ),
+        child: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _apiKeys.isEmpty
+                ? const Center(
+                    child: Text('No API keys created'),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _apiKeys.length,
+                    itemBuilder: (context, index) {
+                      final key = _apiKeys[index];
+                      return Card(
+                        child: ListTile(
+                          leading: const Icon(Icons.vpn_key),
+                          title: Text(key['name'] ?? 'Unknown'),
+                          subtitle: Text(
+                            'Created: ${key['created_at']?.toString().split('T').first ?? 'Unknown'}\n'
+                            'Last used: ${key['last_used']?.toString().split('T').first ?? 'Never'}',
+                          ),
+                          isThreeLine: true,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _deleteKey(key['id'].toString()),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
       ),
       actions: [
         TextButton(
@@ -644,18 +669,22 @@ class _APIKeysDialogState extends ConsumerState<APIKeysDialog> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (_keyNameController.text.isNotEmpty) {
-                setState(() {
-                  _apiKeys.add({
-                    'name': _keyNameController.text,
-                    'created': DateTime.now().toString().split(' ').first,
-                    'lastUsed': 'Never',
-                  });
-                });
                 Navigator.pop(context);
-                _keyNameController.clear();
-                _showKeyCreatedDialog('sk_live_xxxxxxxxxxxxxxxxxxxx');
+                try {
+                  final response = await apiClient.tokens.create(_keyNameController.text);
+                  if (response.data['success'] == true) {
+                    final token = response.data['data']['token'];
+                    _keyNameController.clear();
+                    _loadApiKeys();
+                    _showKeyCreatedDialog(token);
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to create token: $e')),
+                  );
+                }
               }
             },
             child: const Text('Create'),
@@ -695,12 +724,42 @@ class _APIKeysDialogState extends ConsumerState<APIKeysDialog> {
     );
   }
 
-  void _deleteKey(int index) {
-    setState(() {
-      _apiKeys.removeAt(index);
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('API key deleted')),
+  Future<void> _deleteKey(String id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete API Key'),
+        content: const Text('Are you sure you want to delete this API key?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
     );
+
+    if (confirmed == true) {
+      try {
+        await apiClient.tokens.delete(id);
+        _loadApiKeys();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('API key deleted')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete: $e')),
+          );
+        }
+      }
+    }
   }
 }

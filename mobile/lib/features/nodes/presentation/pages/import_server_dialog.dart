@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:anixops_mobile/core/theme/app_theme.dart';
-import 'package:anixops_mobile/core/providers/api_providers.dart';
+import 'package:anixops_mobile/core/services/api_client.dart';
 
 /// Server import dialog with SSH support
 class ImportServerDialog extends ConsumerStatefulWidget {
@@ -47,23 +47,15 @@ class _ImportServerDialogState extends ConsumerState<ImportServerDialog> {
     setState(() => _isLoading = true);
 
     try {
-      final api = ref.read(apiClientProvider);
-      final response = await (_authType == 'password'
-          ? api.ssh.testConnectionWithPassword(
-              host: _hostController.text,
-              port: int.parse(_portController.text),
-              username: _usernameController.text,
-              password: _passwordController.text,
-            )
-          : api.ssh.testConnectionWithKey(
-              host: _hostController.text,
-              port: int.parse(_portController.text),
-              username: _usernameController.text,
-              privateKey: _privateKeyController.text,
-              passphrase: _passphraseController.text.isNotEmpty
-                  ? _passphraseController.text
-                  : null,
-            ));
+      final response = await apiClient.ssh.testConnection(
+        host: _hostController.text,
+        port: int.parse(_portController.text),
+        username: _usernameController.text,
+        authType: _authType,
+        password: _authType == 'password' ? _passwordController.text : null,
+        privateKey: _authType == 'key' ? _privateKeyController.text : null,
+        passphrase: _passphraseController.text.isNotEmpty ? _passphraseController.text : null,
+      );
 
       if (response.data['success'] == true) {
         setState(() {
@@ -102,8 +94,7 @@ class _ImportServerDialogState extends ConsumerState<ImportServerDialog> {
     setState(() => _isLoading = true);
 
     try {
-      final api = ref.read(apiClientProvider);
-      final response = await api.ssh.importServer(
+      final response = await apiClient.ssh.importServer(
         host: _hostController.text,
         port: int.parse(_portController.text),
         username: _usernameController.text,
