@@ -5,86 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## SDK v1.5.0 - 2026-03-17
-
-### Added
-
-#### API Integration
-- REST API v2 support
-- GraphQL endpoint (beta)
-- Webhook management
-- API key management
-- Rate limit configuration
-
-#### Automation
-- Scheduled tasks
-- Task queue management
-- Task history and logs
-- Retry configuration
-
-### Improved
-- API response caching
-- Request batching
-
-## [v0.9.9] - 2026-03-16
-
-### Added
-
-#### i18n & Localization
-- Multi-language support with vue-i18n for Web GUI
-- Translations for 5 languages: English, Simplified Chinese, Traditional Chinese, Japanese, Arabic
-- RTL (Right-to-Left) language support for Arabic
-- Automatic browser language detection
-- Language switcher component
-- Mobile app localization with flutter_localizations
-- ARB localization files for all 5 languages
-
-#### Accessibility
-- Keyboard navigation composable for all components
-- Focus trap for modal dialogs
-- High contrast mode detection and support
-- Reduced motion preference support
-- Screen reader announcement utility
-- Skip link support
-- ARIA labels and semantic HTML
-
-#### Security
-- Rate limiting middleware (1000 requests/minute)
-- Security headers middleware (X-Frame-Options, CSP, etc.)
-- Input sanitization utilities
-- Email and URL validation helpers
-
-### Changed
-- Web GUI version updated to v0.9.9
-- Mobile App version updated to v0.9.9
-- Desktop App version updated to v0.9.9
-- SDK version updated to v1.5.0
-
-## [v0.7.9] - 2026-03-16
-
-### Added
-- Desktop app Linux support with Wails v2
-- Theme customization with 5 accent colors
-- Compact mode and font size options
-- Theme store with Pinia state management
-- ThemeSwitcher component
-
-## [v0.6.9] - 2026-03-16
-
-### Added
-- Mobile app store preparation
-- AndroidManifest.xml with full permissions and features
-- iOS Info.plist with Face ID, camera, notifications
-- Firebase Cloud Messaging integration
-- Deep link support
-
-## [v0.5.9] - 2026-03-16
-
-### Added
-- Theme store with Pinia
-- ThemeSwitcher component
-- Dark/Light/System theme modes
-
 ## [Unreleased]
 
 ### Added
@@ -159,9 +79,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/AnixOps/anixops-control-center/compare/v0.9.9...HEAD
-[v0.9.9]: https://github.com/AnixOps/anixops-control-center/compare/v0.7.9...v0.9.9
-[v0.7.9]: https://github.com/AnixOps/anixops-control-center/compare/v0.6.9...v0.7.9
-[v0.6.9]: https://github.com/AnixOps/anixops-control-center/compare/v0.5.9...v0.6.9
-[v0.5.9]: https://github.com/AnixOps/anixops-control-center/compare/v0.1.0...v0.5.9
+[Unreleased]: https://github.com/AnixOps/anixops-control-center/compare/v0.1.0...HEAD
 [v0.1.0]: https://github.com/AnixOps/anixops-control-center/releases/tag/v0.1.0

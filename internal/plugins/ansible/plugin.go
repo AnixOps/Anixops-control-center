@@ -370,12 +370,12 @@ func parseHosts(output []byte) []string {
 	hosts := []string{}
 	scanner := bufio.NewScanner(strings.NewReader(string(output)))
 	for scanner.Scan() {
-		line := scanner.Text()
-		// Ansible host list has format "  hostname" (indented with spaces)
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" && line != trimmed {
-			// Line had leading whitespace, so it's a host entry
-			hosts = append(hosts, trimmed)
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "  ") {
+			host := strings.TrimSpace(line)
+			if host != "" {
+				hosts = append(hosts, host)
+			}
 		}
 	}
 	return hosts

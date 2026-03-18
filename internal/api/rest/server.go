@@ -2,15 +2,12 @@ package rest
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/anixops/anixops-control-center/internal/api/rest/handlers"
 	"github.com/anixops/anixops-control-center/internal/api/rest/middleware"
 	"github.com/anixops/anixops-control-center/internal/core/plugin"
 	"github.com/anixops/anixops-control-center/internal/security/auth"
-	"github.com/anixops/anixops-control-center/internal/services"
 	"github.com/gin-gonic/gin"
-	"gorm.io/gorm"
 )
 
 // Server represents the REST API server
@@ -28,7 +25,6 @@ type ServerConfig struct {
 	PluginMgr   *plugin.Manager
 	JWTManager  *auth.JWTManager
 	RBACManager *auth.RBACManager
-	DB          *gorm.DB
 }
 
 // NewServer creates a new REST server
@@ -43,38 +39,7 @@ func NewServer(cfg *ServerConfig) *Server {
 		rbacManager: cfg.RBACManager,
 	}
 
-	// Create services
-	var authSvc *services.AuthService
-	var userSvc *services.UserService
-	var nodeSvc *services.NodeService
-	var auditSvc *services.AuditService
-	var dashSvc *services.DashboardService
-	var planSvc *services.PlanService
-	var subSvc *services.SubscriptionService
-	var orderSvc *services.OrderService
-
-	if cfg.DB != nil && cfg.JWTManager != nil {
-		authSvc = services.NewAuthService(cfg.DB, cfg.JWTManager)
-		userSvc = services.NewUserService(cfg.DB)
-		nodeSvc = services.NewNodeService(cfg.DB)
-		auditSvc = services.NewAuditService(cfg.DB)
-		dashSvc = services.NewDashboardService(cfg.DB)
-		planSvc = services.NewPlanService(cfg.DB)
-		subSvc = services.NewSubscriptionService(cfg.DB)
-		orderSvc = services.NewOrderService(cfg.DB)
-	}
-
-	s.handlers = handlers.NewHandlers(
-		s.pluginMgr,
-		authSvc,
-		userSvc,
-		nodeSvc,
-		auditSvc,
-		dashSvc,
-		planSvc,
-		subSvc,
-		orderSvc,
-	)
+	s.handlers = handlers.NewHandlers(s.pluginMgr)
 
 	s.setupMiddleware()
 	s.setupRoutes()
@@ -86,11 +51,8 @@ func NewServer(cfg *ServerConfig) *Server {
 func (s *Server) setupMiddleware() {
 	s.router.Use(gin.Recovery())
 	s.router.Use(middleware.CORSMiddleware())
-	s.router.Use(middleware.SecurityHeaders())
 	s.router.Use(middleware.RequestLogger())
 	s.router.Use(middleware.RequestID())
-	s.router.Use(middleware.RateLimit(1000, time.Minute)) // 1000 requests per minute
-	s.router.Use(middleware.InputSanitizer())
 }
 
 // setupRoutes sets up routes
@@ -106,7 +68,6 @@ func (s *Server) setupRoutes() {
 		authGroup := api.Group("/auth")
 		{
 			authGroup.POST("/login", s.handlers.Login)
-			authGroup.POST("/register", s.handlers.Register)
 			authGroup.POST("/logout", s.handlers.Logout)
 			authGroup.POST("/refresh", s.handlers.RefreshToken)
 			authGroup.GET("/me", s.AuthRequired(), s.handlers.GetCurrentUser)

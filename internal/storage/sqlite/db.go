@@ -80,10 +80,5 @@ func autoMigrate() error {
 		&models.User{},
 		&models.APIToken{},
 		&models.AuditLog{},
-		&models.Node{},
-		&models.Server{},
-		&models.Subscription{},
-		&models.Plan{},
-		&models.Order{},
 	)
 }
