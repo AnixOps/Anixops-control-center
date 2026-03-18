@@ -1,0 +1,49 @@
+name = "anixops-api"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 开发环境配置
+[dev]
+port = 8787
+local_protocol = "http"
+
+# 环境变量
+[vars]
+ENVIRONMENT = "development"
+JWT_EXPIRE = "86400"
+
+# 生产环境
+[env.production]
+name = "anixops-api-prod"
+vars = { ENVIRONMENT = "production" }
+
+# D1 数据库绑定
+[[d1_databases]]
+binding = "DB"
+database_name = "anixops-db"
+database_id = "placeholder-replace-with-actual-id"
+migrations_dir = "migrations"
+
+# KV 命名空间绑定 (会话缓存)
+[[kv_namespaces]]
+binding = "KV"
+id = "placeholder-replace-with-actual-id"
+
+# R2 存储桶绑定 (文件存储)
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "anixops-files"
+
+# Durable Objects (实时通信)
+[[durable_objects.bindings]]
+name = "WEBSOCKET_SERVER"
+class_name = "WebSocketServer"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["WebSocketServer"]
+
+# 触发器 (定时任务)
+[triggers]
+crons = ["*/5 * * * *"]  # 每5分钟执行一次节点状态检查
