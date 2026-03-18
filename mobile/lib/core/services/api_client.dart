@@ -3,6 +3,7 @@ import 'package:anixops_mobile/core/services/auth_api.dart';
 import 'package:anixops_mobile/core/services/nodes_api.dart';
 import 'package:anixops_mobile/core/services/users_api.dart';
 import 'package:anixops_mobile/core/services/plugins_api.dart';
+import 'package:anixops_mobile/core/services/ssh_api.dart';
 
 /// Central API client providing access to all API services
 class ApiClient {
@@ -11,6 +12,7 @@ class ApiClient {
   late final NodesApi nodes;
   late final UsersApi users;
   late final PluginsApi plugins;
+  late final SshApi ssh;
 
   // Cloud API endpoint
   static const String defaultBaseUrl = 'https://api.anixops.com/api/v1';
@@ -55,6 +57,7 @@ class ApiClient {
     nodes = NodesApi(_dio);
     users = UsersApi(_dio);
     plugins = PluginsApi(_dio);
+    ssh = SshApi(_dio);
   }
 
   /// Update base URL

@@ -7,10 +7,12 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/nodes/presentation/pages/nodes_page.dart';
+import '../../features/nodes/presentation/pages/node_detail_page.dart';
 import '../../features/plugins/presentation/pages/plugins_page.dart';
 import '../../features/users/presentation/pages/users_page.dart';
 import '../../features/logs/presentation/pages/logs_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/notifications/presentation/pages/notifications_page.dart';
 
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../shared/presentation/pages/main_shell.dart';
@@ -86,6 +88,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/settings',
             name: 'settings',
             builder: (context, state) => const SettingsPage(),
+          ),
+          GoRoute(
+            path: '/notifications',
+            name: 'notifications',
+            builder: (context, state) => const NotificationsPage(),
           ),
         ],
       ),

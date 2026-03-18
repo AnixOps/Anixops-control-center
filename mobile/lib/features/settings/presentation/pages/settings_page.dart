@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'privacy_policy_page.dart';
 import 'terms_of_service_page.dart';
+import 'profile_page.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 // Settings State
 class SettingsState {
@@ -72,16 +75,30 @@ class SettingsPage extends ConsumerWidget {
         children: [
           // Account Section
           _buildSectionHeader('Account', context),
-          ListTile(
-            leading: CircleAvatar(
-              backgroundColor: theme.colorScheme.primary,
-              child: const Icon(Icons.person, color: Colors.white),
-            ),
-            title: const Text('Admin User'),
-            subtitle: const Text('admin@example.com'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              // Navigate to profile
+          Builder(
+            builder: (context) {
+              final authState = ref.watch(authStateProvider);
+              final userEmail = authState.email ?? 'user@example.com';
+              final userName = userEmail.split('@').first;
+
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: theme.colorScheme.primary,
+                  child: Text(
+                    userName.isNotEmpty ? userName[0].toUpperCase() : 'U',
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                title: Text(userName),
+                subtitle: Text(userEmail),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const ProfilePage()),
+                  );
+                },
+              );
             },
           ),
           ListTile(
@@ -89,7 +106,10 @@ class SettingsPage extends ConsumerWidget {
             title: const Text('Change Password'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
-              // Navigate to change password
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfilePage()),
+              );
             },
           ),
           SwitchListTile(
@@ -98,6 +118,18 @@ class SettingsPage extends ConsumerWidget {
             subtitle: const Text('Add extra security to your account'),
             value: state.twoFactorEnabled,
             onChanged: (value) => ref.read(settingsProvider.notifier).setTwoFactor(value),
+          ),
+          ListTile(
+            leading: const Icon(Icons.vpn_key_outlined),
+            title: const Text('API Keys'),
+            subtitle: const Text('Manage API access tokens'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              showDialog(
+                context: context,
+                builder: (context) => const APIKeysDialog(),
+              );
+            },
           ),
 
           const Divider(),
@@ -297,7 +329,7 @@ class SettingsPage extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: OutlinedButton.icon(
               onPressed: () {
-                _showLogoutDialog(context);
+                _showLogoutDialog(context, ref);
               },
               icon: const Icon(Icons.logout),
               label: const Text('Sign Out'),
@@ -476,7 +508,7 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  void _showLogoutDialog(BuildContext context) {
+  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -488,9 +520,14 @@ class SettingsPage extends ConsumerWidget {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
+              // Perform actual logout
+              await ref.read(authStateProvider.notifier).logout();
               // Navigate to login
+              if (context.mounted) {
+                context.go('/login');
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,

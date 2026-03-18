@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:anixops_mobile/core/theme/app_theme.dart';
 
 import '../providers/nodes_provider.dart';
+import 'import_server_dialog.dart';
+import 'node_detail_page.dart';
 
 // Nodes Page
 class NodesPage extends ConsumerStatefulWidget {
@@ -14,10 +16,65 @@ class NodesPage extends ConsumerStatefulWidget {
 }
 
 class _NodesPageState extends ConsumerState<NodesPage> {
+  final Set<String> _selectedNodes = {};
+  bool _selectionMode = false;
+
   @override
   void initState() {
     super.initState();
     Future.microtask(() => ref.read(nodesProvider.notifier).fetchNodes());
+  }
+
+  void _toggleSelection(String nodeId) {
+    setState(() {
+      if (_selectedNodes.contains(nodeId)) {
+        _selectedNodes.remove(nodeId);
+        if (_selectedNodes.isEmpty) {
+          _selectionMode = false;
+        }
+      } else {
+        _selectedNodes.add(nodeId);
+        _selectionMode = true;
+      }
+    });
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _selectedNodes.clear();
+      _selectionMode = false;
+    });
+  }
+
+  Future<void> _bulkAction(String action) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Bulk $action'),
+        content: Text('Are you sure you want to $action ${_selectedNodes.length} nodes?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: action == 'stop' ? Colors.red : AppTheme.primaryColor,
+            ),
+            child: Text(action.toUpperCase()),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      // TODO: Implement bulk action API call
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$action ${_selectedNodes.length} nodes...')),
+      );
+      _clearSelection();
+    }
   }
 
   @override
@@ -34,14 +91,56 @@ class _NodesPageState extends ConsumerState<NodesPage> {
             SliverAppBar(
               floating: true,
               snap: true,
-              title: const Text('Nodes'),
+              title: _selectionMode
+                  ? Text('${_selectedNodes.length} selected')
+                  : const Text('Nodes'),
+              leading: _selectionMode
+                  ? IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: _clearSelection,
+                    )
+                  : null,
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.add),
-                  onPressed: () {
-                    // TODO: Add node
-                  },
-                ),
+                if (!_selectionMode) ...[
+                  IconButton(
+                    icon: const Icon(Icons.checklist),
+                    onPressed: () => setState(() => _selectionMode = true),
+                    tooltip: 'Select multiple',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: () async {
+                      final result = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => const ImportServerDialog(),
+                      );
+                      if (result == true) {
+                        ref.read(nodesProvider.notifier).refresh();
+                      }
+                    },
+                  ),
+                ] else ...[
+                  IconButton(
+                    icon: const Icon(Icons.play_arrow),
+                    onPressed: _selectedNodes.isEmpty ? null : () => _bulkAction('start'),
+                    tooltip: 'Start all',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.stop),
+                    onPressed: _selectedNodes.isEmpty ? null : () => _bulkAction('stop'),
+                    tooltip: 'Stop all',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh),
+                    onPressed: _selectedNodes.isEmpty ? null : () => _bulkAction('restart'),
+                    tooltip: 'Restart all',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete),
+                    onPressed: _selectedNodes.isEmpty ? null : () => _bulkAction('delete'),
+                    tooltip: 'Delete all',
+                  ),
+                ],
               ],
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(100),
@@ -149,6 +248,9 @@ class _NodesPageState extends ConsumerState<NodesPage> {
                               final node = state.filteredNodes[index];
                               return _NodeCard(
                                 node: node,
+                                isSelected: _selectedNodes.contains(node.id),
+                                selectionMode: _selectionMode,
+                                onSelect: () => _toggleSelection(node.id),
                                 onStart: () => ref.read(nodesProvider.notifier).startNode(node.id),
                                 onStop: () => ref.read(nodesProvider.notifier).stopNode(node.id),
                                 onRestart: () => ref.read(nodesProvider.notifier).restartNode(node.id),
@@ -197,12 +299,18 @@ class _NodesPageState extends ConsumerState<NodesPage> {
 
 class _NodeCard extends StatelessWidget {
   final Node node;
+  final bool isSelected;
+  final bool selectionMode;
+  final VoidCallback? onSelect;
   final VoidCallback? onStart;
   final VoidCallback? onStop;
   final VoidCallback? onRestart;
 
   const _NodeCard({
     required this.node,
+    this.isSelected = false,
+    this.selectionMode = false,
+    this.onSelect,
     this.onStart,
     this.onStop,
     this.onRestart,
@@ -223,10 +331,27 @@ class _NodeCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      color: isSelected ? AppTheme.primaryColor.withOpacity(0.1) : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: isSelected
+            ? BorderSide(color: AppTheme.primaryColor, width: 2)
+            : BorderSide.none,
+      ),
       child: InkWell(
         onTap: () {
-          // TODO: Navigate to node detail
+          if (selectionMode) {
+            onSelect?.call();
+          } else {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => NodeDetailPage(nodeId: node.id),
+              ),
+            );
+          }
         },
+        onLongPress: selectionMode ? null : onSelect,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
