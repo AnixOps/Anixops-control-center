@@ -156,7 +156,7 @@ class AppTheme {
         elevation: 0,
         centerTitle: true,
       ),
-      cardTheme: CardThemeData(
+      cardTheme: CardTheme(
         color: lightCard,
         elevation: 0,
         shape: RoundedRectangleBorder(
