@@ -7,11 +7,14 @@ on:
         description: 'Release version (e.g., v1.0.0-rc.1)'
         required: true
         type: string
-      prerelease:
-        description: 'Pre-release'
-        required: false
-        type: boolean
-        default: true
+      environment:
+        description: 'Release environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - prod
+        default: dev
 
 permissions:
   contents: write
@@ -24,6 +27,7 @@ jobs:
   build-android:
     name: Android
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
     steps:
       - uses: actions/checkout@v4
 
@@ -97,6 +101,7 @@ jobs:
   build-web:
     name: Web
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
     steps:
       - uses: actions/checkout@v4
 
@@ -131,6 +136,7 @@ jobs:
   build-windows:
     name: Windows
     runs-on: windows-latest
+    environment: ${{ github.event.inputs.environment }}
     steps:
       - uses: actions/checkout@v4
 
@@ -164,6 +170,7 @@ jobs:
   build-macos:
     name: macOS
     runs-on: macos-latest
+    environment: ${{ github.event.inputs.environment }}
     steps:
       - uses: actions/checkout@v4
 
@@ -198,6 +205,7 @@ jobs:
   build-linux:
     name: Linux
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
     steps:
       - uses: actions/checkout@v4
 
@@ -237,6 +245,7 @@ jobs:
   build-ios:
     name: iOS
     runs-on: macos-latest
+    environment: ${{ github.event.inputs.environment }}
     steps:
       - uses: actions/checkout@v4
 
@@ -271,6 +280,7 @@ jobs:
   build-cli:
     name: CLI (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
+    environment: ${{ github.event.inputs.environment }}
     strategy:
       matrix:
         include:
@@ -352,6 +362,7 @@ jobs:
     name: Create Release
     needs: [build-android, build-web, build-windows, build-macos, build-linux, build-ios, build-cli]
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
     steps:
       - uses: actions/checkout@v4
 
@@ -369,27 +380,38 @@ jobs:
           sha512sum * > checksums.sha512
           ls -la
 
+      - name: Determine prerelease status
+        id: prerelease
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "dev" ]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ github.event.inputs.version }}
           name: AnixOps Control Center ${{ github.event.inputs.version }}
-          prerelease: ${{ github.event.inputs.prerelease }}
+          prerelease: ${{ steps.prerelease.outputs.is_prerelease }}
           generate_release_notes: true
           body: |
             ## AnixOps Control Center ${{ github.event.inputs.version }}
 
+            **Environment**: ${{ github.event.inputs.environment == 'dev' && 'Development' || 'Production' }}
+
             ### GUI Applications (Flutter)
 
-            | Platform | File | Size |
-            |----------|------|------|
-            | Android | `anixops-${{ github.event.inputs.version }}-android.apk` | Phone/Tablet |
-            | Android (Store) | `anixops-${{ github.event.inputs.version }}-android.aab` | Play Store |
-            | Windows | `anixops-${{ github.event.inputs.version }}-windows.zip` | x64 |
-            | macOS | `anixops-${{ github.event.inputs.version }}-macos.zip` | Universal |
-            | Linux | `anixops-${{ github.event.inputs.version }}-linux.tar.gz` | x64 |
-            | Web | `anixops-${{ github.event.inputs.version }}-web.zip` | Static hosting |
-            | iOS | `anixops-${{ github.event.inputs.version }}-ios.zip` | Requires signing |
+            | Platform | File |
+            |----------|------|
+            | Android | `anixops-${{ github.event.inputs.version }}-android.apk` |
+            | Android (Store) | `anixops-${{ github.event.inputs.version }}-android.aab` |
+            | Windows | `anixops-${{ github.event.inputs.version }}-windows.zip` |
+            | macOS | `anixops-${{ github.event.inputs.version }}-macos.zip` |
+            | Linux | `anixops-${{ github.event.inputs.version }}-linux.tar.gz` |
+            | Web | `anixops-${{ github.event.inputs.version }}-web.zip` |
+            | iOS | `anixops-${{ github.event.inputs.version }}-ios.zip` |
 
             ### CLI Tools
 
@@ -409,13 +431,6 @@ jobs:
             - Biometric authentication
             - Multi-language support (EN, ZH, JA, AR)
             - Dark theme
-
-            ### Installation
-            - **Android**: Download APK and install
-            - **Windows**: Extract zip and run `anixops.exe`
-            - **macOS**: Extract zip, move app to Applications
-            - **Linux**: Extract tar.gz and run `anixops`
-            - **CLI**: Extract and add to PATH
 
             ### Checksums
             See `checksums.sha256` and `checksums.sha512` for verification.
