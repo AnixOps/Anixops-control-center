@@ -12,8 +12,11 @@ class ApiClient {
   late final UsersApi users;
   late final PluginsApi plugins;
 
+  // Cloud API endpoint
+  static const String defaultBaseUrl = 'https://api.anixops.com/api/v1';
+
   ApiClient({
-    String baseUrl = 'http://localhost:8080/api/v1',
+    String baseUrl = defaultBaseUrl,
     Duration connectTimeout = const Duration(seconds: 30),
     Duration receiveTimeout = const Duration(seconds: 30),
   }) {

@@ -7,10 +7,7 @@ class AuthApi {
   AuthApi(this._dio);
 
   /// Login with email and password
-  Future<Response> login({
-    required String email,
-    required String password,
-  }) async {
+  Future<Response> login(String email, String password) async {
     return _dio.post('/auth/login', data: {
       'email': email,
       'password': password,
@@ -23,28 +20,15 @@ class AuthApi {
   }
 
   /// Refresh authentication token
-  Future<Response> refreshToken(String refreshToken) async {
+  Future<Response> refresh(String refreshToken) async {
     return _dio.post('/auth/refresh', data: {
       'refresh_token': refreshToken,
     });
   }
 
-  /// Register new user
-  Future<Response> register({
-    required String email,
-    required String password,
-    String? name,
-  }) async {
-    return _dio.post('/auth/register', data: {
-      'email': email,
-      'password': password,
-      'name': name,
-    });
-  }
-
   /// Get current user info
   Future<Response> me() async {
-    return _dio.get('/auth/me');
+    return _dio.get('/users/me');
   }
 
   /// Update password

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +13,7 @@ import '../../features/settings/presentation/pages/settings_page.dart';
 
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../shared/presentation/pages/main_shell.dart';
+import '../../desktop/desktop_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -37,12 +39,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const LoginPage(),
+        builder: (context, state) => _buildLoginShell(const LoginPage()),
       ),
 
-      // Main app shell with bottom navigation
+      // Main app shell - different layout for desktop vs mobile
       ShellRoute(
-        builder: (context, state, child) => MainShell(child: child),
+        builder: (context, state, child) => _buildMainShell(child),
         routes: [
           GoRoute(
             path: '/dashboard',
@@ -53,6 +55,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/nodes',
             name: 'nodes',
             builder: (context, state) => const NodesPage(),
+          ),
+          GoRoute(
+            path: '/playbooks',
+            name: 'playbooks',
+            builder: (context, state) => const PlaybooksPage(),
           ),
           GoRoute(
             path: '/plugins',
@@ -81,6 +88,22 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
+/// Build appropriate main shell based on platform
+Widget _buildMainShell(Widget child) {
+  if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+    return DesktopShell(child: child);
+  }
+  return MainShell(child: child);
+}
+
+/// Build login shell with appropriate layout
+Widget _buildLoginShell(Widget child) {
+  if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+    return DesktopLoginShell(child: child);
+  }
+  return child;
+}
+
 class ErrorPage extends StatelessWidget {
   const ErrorPage({super.key});
 
@@ -102,6 +125,32 @@ class ErrorPage extends StatelessWidget {
               onPressed: () => context.go('/dashboard'),
               child: const Text('Go Home'),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Placeholder for PlaybooksPage
+class PlaybooksPage extends StatelessWidget {
+  const PlaybooksPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.play_circle_outline, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              'Playbooks',
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: 8),
+            const Text('Ansible playbook management'),
           ],
         ),
       ),
