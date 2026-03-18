@@ -59,3 +59,7 @@ web/dist/
 configs/config.prod.yaml
 *.pem
 *.key
+
+# Wrangler
+.wrangler/
+.dev.vars

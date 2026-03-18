@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { sign } from 'jose'
+import { SignJWT, jwtVerify } from 'jose'
 import { hash, compare } from 'bcryptjs'
 import { z } from 'zod'
 import type { Env, User } from '../types'
@@ -15,6 +15,21 @@ const registerSchema = z.object({
   password: z.string().min(8),
   role: z.enum(['admin', 'operator', 'viewer']).optional(),
 })
+
+/**
+ * 生成 JWT Token
+ */
+async function generateToken(
+  payload: { sub: number; email: string; role: string },
+  secret: Uint8Array,
+  expiresIn: string
+): Promise<string> {
+  return await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime(expiresIn)
+    .sign(secret)
+}
 
 /**
  * 登录
@@ -44,23 +59,16 @@ export async function loginHandler(c: Context<{ Bindings: Env }>) {
     const secret = new TextEncoder().encode(c.env.JWT_SECRET)
     const expire = parseInt(c.env.JWT_EXPIRE, 10) || 86400
 
-    const accessToken = await sign(
-      {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-      },
+    const accessToken = await generateToken(
+      { sub: user.id, email: user.email, role: user.role },
       secret,
-      { expiresIn: `${expire}s` }
+      `${expire}s`
     )
 
-    const refreshToken = await sign(
-      {
-        sub: user.id,
-        type: 'refresh',
-      },
+    const refreshToken = await generateToken(
+      { sub: user.id, email: '', role: '' },
       secret,
-      { expiresIn: '7d' }
+      '7d'
     )
 
     // 更新最后登录时间
@@ -152,13 +160,7 @@ export async function refreshHandler(c: Context<{ Bindings: Env }>) {
 
   try {
     const secret = new TextEncoder().encode(c.env.JWT_SECRET)
-    const { payload } = await import('jose').then(jose =>
-      jose.verify(body.refresh_token!, secret, { algorithms: ['HS256'] })
-    )
-
-    if (payload.type !== 'refresh') {
-      return c.json({ success: false, error: 'Invalid token type' }, 401)
-    }
+    const { payload } = await jwtVerify(body.refresh_token, secret)
 
     // 获取用户信息
     const user = await c.env.DB
@@ -172,14 +174,10 @@ export async function refreshHandler(c: Context<{ Bindings: Env }>) {
 
     // 生成新的 access token
     const expire = parseInt(c.env.JWT_EXPIRE, 10) || 86400
-    const accessToken = await sign(
-      {
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-      },
+    const accessToken = await generateToken(
+      { sub: user.id, email: user.email, role: user.role },
       secret,
-      { expiresIn: `${expire}s` }
+      `${expire}s`
     )
 
     return c.json({

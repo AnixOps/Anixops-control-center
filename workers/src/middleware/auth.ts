@@ -1,5 +1,5 @@
 import type { Context, Next } from 'hono'
-import { verify } from 'jose'
+import { jwtVerify } from 'jose'
 import type { Env, JWTPayload } from '../types'
 
 /**
@@ -16,9 +16,7 @@ export async function authMiddleware(c: Context<{ Bindings: Env }>, next: Next) 
 
   try {
     const secret = new TextEncoder().encode(c.env.JWT_SECRET)
-    const { payload } = await verify(token, secret, {
-      algorithms: ['HS256'],
-    })
+    const { payload } = await jwtVerify(token, secret)
 
     c.set('user', payload as JWTPayload)
     await next()

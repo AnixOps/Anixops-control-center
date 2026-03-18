@@ -22,13 +22,13 @@ vars = { ENVIRONMENT = "production" }
 [[d1_databases]]
 binding = "DB"
 database_name = "anixops-db"
-database_id = "placeholder-replace-with-actual-id"
+database_id = "1fd85576-c08d-44f3-a0fb-ec5fc845f1e5"
 migrations_dir = "migrations"
 
 # KV 命名空间绑定 (会话缓存)
 [[kv_namespaces]]
 binding = "KV"
-id = "placeholder-replace-with-actual-id"
+id = "35a39ccc4cea47e89aa8b1459f85e1cf"
 
 # R2 存储桶绑定 (文件存储)
 [[r2_buckets]]
@@ -42,7 +42,7 @@ class_name = "WebSocketServer"
 
 [[migrations]]
 tag = "v1"
-new_classes = ["WebSocketServer"]
+new_sqlite_classes = ["WebSocketServer"]
 
 # 触发器 (定时任务)
 [triggers]
