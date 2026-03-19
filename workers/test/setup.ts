@@ -90,6 +90,9 @@ export function createMockR2(): R2Bucket {
       if (!item) return null
       return { key, size: item.body.length }
     }) as any,
+
+    createMultipartUpload: vi.fn(async () => ({ uploadId: 'mock' })) as any,
+    resumeMultipartUpload: vi.fn(async () => ({ uploadId: 'mock' })) as any,
   }
 }
 
@@ -132,6 +135,10 @@ export function createMockD1(): D1Database {
     }) as any,
 
     withSession: vi.fn(() => createMockD1()) as any,
+
+    dump: vi.fn(async () => {
+      return new ArrayBuffer(0)
+    }) as any,
   }
 }
 

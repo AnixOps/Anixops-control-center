@@ -20,6 +20,24 @@ import { listSchedulesHandler, getScheduleHandler, createScheduleHandler, update
 import { listNodeGroupsHandler, getNodeGroupHandler, createNodeGroupHandler, updateNodeGroupHandler, deleteNodeGroupHandler, addNodesToGroupHandler, removeNodesFromGroupHandler } from './handlers/node-groups'
 import { sseHandler, sseSubscribeHandler, sseUnsubscribeHandler, sseStatusHandler } from './handlers/sse'
 import { createBackupHandler, listBackupsHandler, getBackupHandler, deleteBackupHandler, downloadBackupHandler, restoreBackupHandler, cleanupBackupsHandler, backupStatusHandler } from './handlers/backup'
+import {
+  registerAgentHandler,
+  agentHeartbeatHandler,
+  agentMetricsHandler,
+  agentCommandResultHandler,
+  sendAgentCommandHandler,
+  getAgentMetricsHandler,
+  generateInstallScriptHandler,
+} from './handlers/agents'
+import {
+  getMFAStatusHandler,
+  setupMFAHandler,
+  enableMFAHandler,
+  disableMFAHandler,
+  verifyMFAHandler,
+  regenerateRecoveryCodesHandler,
+  adminDisableMFAHandler,
+} from './handlers/mfa'
 
 // Middleware
 import { authMiddleware, rbacMiddleware } from './middleware/auth'
@@ -179,6 +197,27 @@ app.get('/api/v1/backups/:id/download', authMiddleware, rbacMiddleware(['admin']
 app.post('/api/v1/backups/:id/restore', authMiddleware, rbacMiddleware(['admin']), restoreBackupHandler)
 app.delete('/api/v1/backups/:id', authMiddleware, rbacMiddleware(['admin']), deleteBackupHandler)
 app.post('/api/v1/backups/cleanup', authMiddleware, rbacMiddleware(['admin']), cleanupBackupsHandler)
+
+// ==================== Agent 管理 ====================
+// Agent API (认证通过Header)
+app.post('/api/v1/agents/register', registerAgentHandler)
+app.post('/api/v1/agents/heartbeat', agentHeartbeatHandler)
+app.post('/api/v1/agents/metrics', agentMetricsHandler)
+app.post('/api/v1/agents/command-result', agentCommandResultHandler)
+
+// Agent 管理API (需要用户认证)
+app.get('/api/v1/agents/:agentId/metrics', authMiddleware, getAgentMetricsHandler)
+app.post('/api/v1/agents/:agentId/command', authMiddleware, rbacMiddleware(['admin', 'operator']), sendAgentCommandHandler)
+app.get('/api/v1/nodes/:nodeId/install-script', authMiddleware, rbacMiddleware(['admin', 'operator']), generateInstallScriptHandler)
+
+// ==================== MFA 双因素认证 ====================
+app.get('/api/v1/mfa/status', authMiddleware, getMFAStatusHandler)
+app.post('/api/v1/mfa/setup', authMiddleware, setupMFAHandler)
+app.post('/api/v1/mfa/enable', authMiddleware, enableMFAHandler)
+app.post('/api/v1/mfa/disable', authMiddleware, disableMFAHandler)
+app.post('/api/v1/mfa/verify', authMiddleware, verifyMFAHandler)
+app.post('/api/v1/mfa/recovery-codes', authMiddleware, regenerateRecoveryCodesHandler)
+app.post('/api/v1/admin/users/:id/mfa/disable', authMiddleware, rbacMiddleware(['admin']), adminDisableMFAHandler)
 
 // ==================== WebSocket ====================
 // WebSocket 暂时禁用 - Durable Object 有问题

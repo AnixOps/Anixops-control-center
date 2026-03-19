@@ -51,6 +51,14 @@ export interface Node {
   status: 'online' | 'offline' | 'maintenance'
   last_seen?: string
   config?: string
+  agent_id?: string
+  agent_secret?: string
+  agent_version?: string
+  os?: string
+  arch?: string
+  cpu_count?: number
+  memory_gb?: number
+  disk_gb?: number
   created_at: string
   updated_at: string
 }
