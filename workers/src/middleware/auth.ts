@@ -1,6 +1,23 @@
 import type { Context, Next } from 'hono'
 import { jwtVerify } from 'jose'
-import type { Env, JWTPayload } from '../types'
+import type { Env } from '../types'
+import { isTokenRevoked, isUserSessionRevoked } from '../utils/token'
+
+// Internal JWT Payload type
+interface AppJWTPayload {
+  sub: number
+  email: string
+  role: string
+  iat: number
+  exp: number
+}
+
+/**
+ * 检查 Token 是否在黑名单中
+ */
+async function isTokenBlacklisted(kv: KVNamespace, token: string): Promise<boolean> {
+  return isTokenRevoked(kv, token)
+}
 
 /**
  * JWT 认证中间件
@@ -15,10 +32,29 @@ export async function authMiddleware(c: Context<{ Bindings: Env }>, next: Next) 
   const token = authHeader.substring(7)
 
   try {
+    // 检查 Token 黑名单
+    if (await isTokenBlacklisted(c.env.KV, token)) {
+      return c.json({ success: false, error: 'Token has been revoked' }, 401)
+    }
+
     const secret = new TextEncoder().encode(c.env.JWT_SECRET)
     const { payload } = await jwtVerify(token, secret)
 
-    c.set('user', payload as JWTPayload)
+    // Convert jose JWTPayload to our internal format
+    const userPayload: AppJWTPayload = {
+      sub: typeof payload.sub === 'string' ? parseInt(payload.sub, 10) : (typeof payload.sub === 'number' ? payload.sub : 0),
+      email: payload.email as string,
+      role: payload.role as string,
+      iat: payload.iat || 0,
+      exp: payload.exp || 0,
+    }
+
+    // 检查用户会话是否被全局撤销
+    if (await isUserSessionRevoked(c.env.KV, userPayload.sub, userPayload.iat)) {
+      return c.json({ success: false, error: 'Session has been revoked. Please login again.' }, 401)
+    }
+
+    c.set('user', userPayload as unknown as import('../types').JWTPayload)
     await next()
   } catch (err) {
     if (err instanceof Error) {

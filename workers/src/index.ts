@@ -8,13 +8,18 @@ import type { Env } from './types'
 import { healthHandler, readinessHandler } from './handlers/health'
 import { loginHandler, registerHandler, refreshHandler, logoutHandler, meHandler } from './handlers/auth'
 import { listNodesHandler, getNodeHandler, createNodeHandler, updateNodeHandler, deleteNodeHandler, startNodeHandler, stopNodeHandler, restartNodeHandler, getNodeStatsHandler, getNodeLogsHandler, testNodeConnectionHandler, syncNodeHandler, bulkActionHandler } from './handlers/nodes'
-import { listPlaybooksHandler, getPlaybookHandler, uploadPlaybookHandler, runPlaybookHandler } from './handlers/playbooks'
+import { listPlaybooksHandler, getPlaybookHandler, uploadPlaybookHandler, deletePlaybookHandler, listBuiltInPlaybooksHandler, getPlaybookCategoriesHandler, syncBuiltInPlaybooksHandler } from './handlers/playbooks'
 import { listPluginsHandler, getPluginHandler, executePluginHandler } from './handlers/plugins'
 import { dashboardHandler, statsHandler } from './handlers/dashboard'
 import { listAuditLogsHandler } from './handlers/audit'
-import { listUsersHandler, getUserHandler, createUserHandler, updateUserHandler, deleteUserHandler, changePasswordHandler, getCurrentUserHandler, updateCurrentUserHandler, listApiTokensHandler, createApiTokenHandler, deleteApiTokenHandler, listSessionsHandler, deleteOtherSessionsHandler } from './handlers/users'
+import { listUsersHandler, getUserHandler, createUserHandler, updateUserHandler, deleteUserHandler, changePasswordHandler, getCurrentUserHandler, updateCurrentUserHandler, listApiTokensHandler, createApiTokenHandler, deleteApiTokenHandler, listSessionsHandler, deleteOtherSessionsHandler, getUserLockoutHandler, unlockUserHandler } from './handlers/users'
 import { testConnectionHandler, importServerHandler, detectServerTypeHandler } from './handlers/ssh'
 import { listNotificationsHandler, markNotificationReadHandler, markAllNotificationsReadHandler, deleteNotificationHandler, createNotificationHandler, getUnreadCountHandler } from './handlers/notifications'
+import { listTasksHandler, getTaskHandler, createTaskHandler, cancelTaskHandler, retryTaskHandler, getTaskLogsHandler } from './handlers/tasks'
+import { listSchedulesHandler, getScheduleHandler, createScheduleHandler, updateScheduleHandler, deleteScheduleHandler, toggleScheduleHandler, runScheduleNowHandler } from './handlers/schedules'
+import { listNodeGroupsHandler, getNodeGroupHandler, createNodeGroupHandler, updateNodeGroupHandler, deleteNodeGroupHandler, addNodesToGroupHandler, removeNodesFromGroupHandler } from './handlers/node-groups'
+import { sseHandler, sseSubscribeHandler, sseUnsubscribeHandler, sseStatusHandler } from './handlers/sse'
+import { createBackupHandler, listBackupsHandler, getBackupHandler, deleteBackupHandler, downloadBackupHandler, restoreBackupHandler, cleanupBackupsHandler, backupStatusHandler } from './handlers/backup'
 
 // Middleware
 import { authMiddleware, rbacMiddleware } from './middleware/auth'
@@ -80,6 +85,10 @@ app.post('/api/v1/users', authMiddleware, rbacMiddleware(['admin']), createUserH
 app.put('/api/v1/users/:id', authMiddleware, rbacMiddleware(['admin']), updateUserHandler)
 app.delete('/api/v1/users/:id', authMiddleware, rbacMiddleware(['admin']), deleteUserHandler)
 
+// 账户锁定管理 (需要管理员权限)
+app.get('/api/v1/users/:id/lockout', authMiddleware, rbacMiddleware(['admin']), getUserLockoutHandler)
+app.post('/api/v1/users/:id/unlock', authMiddleware, rbacMiddleware(['admin']), unlockUserHandler)
+
 // SSH导入
 app.post('/api/v1/ssh/test', authMiddleware, rbacMiddleware(['admin', 'operator']), testConnectionHandler)
 app.post('/api/v1/ssh/import', authMiddleware, rbacMiddleware(['admin', 'operator']), importServerHandler)
@@ -102,9 +111,38 @@ app.delete('/api/v1/nodes/:id', authMiddleware, rbacMiddleware(['admin']), delet
 
 // Playbook 管理
 app.get('/api/v1/playbooks', authMiddleware, listPlaybooksHandler)
+app.get('/api/v1/playbooks/built-in', authMiddleware, listBuiltInPlaybooksHandler)
+app.get('/api/v1/playbooks/categories', authMiddleware, getPlaybookCategoriesHandler)
+app.post('/api/v1/playbooks/sync-builtin', authMiddleware, rbacMiddleware(['admin']), syncBuiltInPlaybooksHandler)
 app.get('/api/v1/playbooks/:name', authMiddleware, getPlaybookHandler)
 app.post('/api/v1/playbooks', authMiddleware, rbacMiddleware(['admin', 'operator']), uploadPlaybookHandler)
-app.post('/api/v1/playbooks/:name/run', authMiddleware, rbacMiddleware(['admin', 'operator']), runPlaybookHandler)
+app.delete('/api/v1/playbooks/:name', authMiddleware, rbacMiddleware(['admin']), deletePlaybookHandler)
+
+// 任务管理
+app.get('/api/v1/tasks', authMiddleware, listTasksHandler)
+app.post('/api/v1/tasks', authMiddleware, rbacMiddleware(['admin', 'operator']), createTaskHandler)
+app.get('/api/v1/tasks/:id', authMiddleware, getTaskHandler)
+app.get('/api/v1/tasks/:id/logs', authMiddleware, getTaskLogsHandler)
+app.post('/api/v1/tasks/:id/cancel', authMiddleware, rbacMiddleware(['admin', 'operator']), cancelTaskHandler)
+app.post('/api/v1/tasks/:id/retry', authMiddleware, rbacMiddleware(['admin', 'operator']), retryTaskHandler)
+
+// 调度管理
+app.get('/api/v1/schedules', authMiddleware, listSchedulesHandler)
+app.post('/api/v1/schedules', authMiddleware, rbacMiddleware(['admin', 'operator']), createScheduleHandler)
+app.get('/api/v1/schedules/:id', authMiddleware, getScheduleHandler)
+app.put('/api/v1/schedules/:id', authMiddleware, rbacMiddleware(['admin', 'operator']), updateScheduleHandler)
+app.delete('/api/v1/schedules/:id', authMiddleware, rbacMiddleware(['admin']), deleteScheduleHandler)
+app.post('/api/v1/schedules/:id/toggle', authMiddleware, rbacMiddleware(['admin', 'operator']), toggleScheduleHandler)
+app.post('/api/v1/schedules/:id/run', authMiddleware, rbacMiddleware(['admin', 'operator']), runScheduleNowHandler)
+
+// 节点组管理
+app.get('/api/v1/node-groups', authMiddleware, listNodeGroupsHandler)
+app.post('/api/v1/node-groups', authMiddleware, rbacMiddleware(['admin', 'operator']), createNodeGroupHandler)
+app.get('/api/v1/node-groups/:id', authMiddleware, getNodeGroupHandler)
+app.put('/api/v1/node-groups/:id', authMiddleware, rbacMiddleware(['admin', 'operator']), updateNodeGroupHandler)
+app.delete('/api/v1/node-groups/:id', authMiddleware, rbacMiddleware(['admin']), deleteNodeGroupHandler)
+app.post('/api/v1/node-groups/:id/nodes', authMiddleware, rbacMiddleware(['admin', 'operator']), addNodesToGroupHandler)
+app.delete('/api/v1/node-groups/:id/nodes', authMiddleware, rbacMiddleware(['admin', 'operator']), removeNodesFromGroupHandler)
 
 // 插件管理
 app.get('/api/v1/plugins', authMiddleware, listPluginsHandler)
@@ -126,13 +164,31 @@ app.put('/api/v1/notifications/:id/read', authMiddleware, markNotificationReadHa
 app.put('/api/v1/notifications/read-all', authMiddleware, markAllNotificationsReadHandler)
 app.delete('/api/v1/notifications/:id', authMiddleware, deleteNotificationHandler)
 
-// ==================== WebSocket ====================
+// ==================== SSE (实时通信) ====================
+app.get('/api/v1/sse', authMiddleware, sseHandler)
+app.post('/api/v1/sse/subscribe', authMiddleware, sseSubscribeHandler)
+app.post('/api/v1/sse/unsubscribe', authMiddleware, sseUnsubscribeHandler)
+app.get('/api/v1/sse/status', authMiddleware, sseStatusHandler)
 
+// ==================== 备份管理 ====================
+app.get('/api/v1/backups', authMiddleware, rbacMiddleware(['admin']), listBackupsHandler)
+app.get('/api/v1/backups/status', authMiddleware, rbacMiddleware(['admin']), backupStatusHandler)
+app.post('/api/v1/backups', authMiddleware, rbacMiddleware(['admin']), createBackupHandler)
+app.get('/api/v1/backups/:id', authMiddleware, rbacMiddleware(['admin']), getBackupHandler)
+app.get('/api/v1/backups/:id/download', authMiddleware, rbacMiddleware(['admin']), downloadBackupHandler)
+app.post('/api/v1/backups/:id/restore', authMiddleware, rbacMiddleware(['admin']), restoreBackupHandler)
+app.delete('/api/v1/backups/:id', authMiddleware, rbacMiddleware(['admin']), deleteBackupHandler)
+app.post('/api/v1/backups/cleanup', authMiddleware, rbacMiddleware(['admin']), cleanupBackupsHandler)
+
+// ==================== WebSocket ====================
+// WebSocket 暂时禁用 - Durable Object 有问题
+/*
 app.get('/api/v1/ws', async (c) => {
   const id = c.env.WEBSOCKET_SERVER.idFromName('global')
   const stub = c.env.WEBSOCKET_SERVER.get(id)
   return stub.fetch(c.req.raw)
 })
+*/
 
 // ==================== 错误处理 ====================
 
@@ -156,7 +212,8 @@ app.onError((err, c) => {
 })
 
 // ==================== Durable Object ====================
-
+// 暂时禁用以调试 Cloudflare 错误 1101
+/*
 export class WebSocketServer {
   private state: DurableObjectState
   private sessions: Map<WebSocket, { userId?: number }>
@@ -234,6 +291,7 @@ export class WebSocketServer {
     }
   }
 }
+*/
 
-// 导出
+// Export
 export default app

@@ -2,23 +2,27 @@ import type { Context } from 'hono'
 import { z } from 'zod'
 import { hash, compare } from 'bcryptjs'
 import type { Env, User } from '../types'
+import { logAudit } from '../utils/audit'
+import { passwordSchema, validatePassword } from '../utils/password'
+import { revokeAllUserSessions } from '../utils/token'
+import { unlockAccount, getLockoutInfo } from '../utils/lockout'
 
 const createUserSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
   role: z.enum(['admin', 'operator', 'viewer']).default('viewer'),
 })
 
 const updateUserSchema = z.object({
   email: z.string().email().optional(),
-  password: z.string().min(8).optional(),
+  password: passwordSchema.optional(),
   role: z.enum(['admin', 'operator', 'viewer']).optional(),
   enabled: z.boolean().optional(),
 })
 
-const changePasswordSchema = z.object({
+const changePasswordSchemaLocal = z.object({
   current_password: z.string().min(1),
-  new_password: z.string().min(8),
+  new_password: passwordSchema,
 })
 
 const createTokenSchema = z.object({
@@ -73,7 +77,7 @@ export async function listUsersHandler(c: Context<{ Bindings: Env }>) {
  * 获取单个用户
  */
 export async function getUserHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
 
   const user = await c.env.DB
     .prepare('SELECT id, email, role, auth_provider, enabled, last_login_at, created_at FROM users WHERE id = ?')
@@ -100,6 +104,16 @@ export async function createUserHandler(c: Context<{ Bindings: Env }>) {
     const body = await c.req.json()
     const data = createUserSchema.parse(body)
 
+    // 额外的密码复杂度验证
+    const passwordValidation = validatePassword(data.password)
+    if (!passwordValidation.valid) {
+      return c.json({
+        success: false,
+        error: 'Password does not meet complexity requirements',
+        details: passwordValidation.errors,
+      }, 400)
+    }
+
     // 检查邮箱是否已存在
     const existing = await c.env.DB
       .prepare('SELECT id FROM users WHERE email = ?')
@@ -111,7 +125,7 @@ export async function createUserHandler(c: Context<{ Bindings: Env }>) {
     }
 
     // 哈希密码
-    const passwordHash = await hash(data.password, 10)
+    const passwordHash = await hash(data.password, 12)
 
     const result = await c.env.DB
       .prepare(`
@@ -140,7 +154,7 @@ export async function createUserHandler(c: Context<{ Bindings: Env }>) {
  * 更新用户
  */
 export async function updateUserHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
   const currentUser = c.get('user')
 
   try {
@@ -166,8 +180,17 @@ export async function updateUserHandler(c: Context<{ Bindings: Env }>) {
       values.push(data.email)
     }
     if (data.password) {
+      // 验证密码复杂度
+      const passwordValidation = validatePassword(data.password)
+      if (!passwordValidation.valid) {
+        return c.json({
+          success: false,
+          error: 'Password does not meet complexity requirements',
+          details: passwordValidation.errors,
+        }, 400)
+      }
       updates.push('password_hash = ?')
-      values.push(await hash(data.password, 10))
+      values.push(await hash(data.password, 12))
     }
     if (data.role) {
       updates.push('role = ?')
@@ -190,6 +213,11 @@ export async function updateUserHandler(c: Context<{ Bindings: Env }>) {
       .bind(...values)
       .first()
 
+    // 如果更新了密码，撤销用户所有会话
+    if (data.password) {
+      await revokeAllUserSessions(c.env.KV, parseInt(id, 10))
+    }
+
     await logAudit(c, currentUser.sub, 'update_user', 'user', { user_id: id })
 
     return c.json({
@@ -208,7 +236,7 @@ export async function updateUserHandler(c: Context<{ Bindings: Env }>) {
  * 删除用户
  */
 export async function deleteUserHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
   const currentUser = c.get('user')
 
   // 不能删除自己
@@ -233,33 +261,6 @@ export async function deleteUserHandler(c: Context<{ Bindings: Env }>) {
   })
 }
 
-async function logAudit(
-  c: Context<{ Bindings: Env }>,
-  userId: number,
-  action: string,
-  resource: string,
-  details?: Record<string, unknown>
-) {
-  try {
-    await c.env.DB
-      .prepare(`
-        INSERT INTO audit_logs (user_id, action, resource, ip, user_agent, details)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `)
-      .bind(
-        userId,
-        action,
-        resource,
-        c.req.header('CF-Connecting-IP') || null,
-        c.req.header('User-Agent') || null,
-        details ? JSON.stringify(details) : null
-      )
-      .run()
-  } catch (err) {
-    console.error('Failed to log audit:', err)
-  }
-}
-
 /**
  * 修改密码
  */
@@ -268,7 +269,17 @@ export async function changePasswordHandler(c: Context<{ Bindings: Env }>) {
 
   try {
     const body = await c.req.json()
-    const data = changePasswordSchema.parse(body)
+    const data = changePasswordSchemaLocal.parse(body)
+
+    // 验证新密码复杂度
+    const passwordValidation = validatePassword(data.new_password)
+    if (!passwordValidation.valid) {
+      return c.json({
+        success: false,
+        error: 'Password does not meet complexity requirements',
+        details: passwordValidation.errors,
+      }, 400)
+    }
 
     // 获取用户当前密码
     const user = await c.env.DB
@@ -286,18 +297,26 @@ export async function changePasswordHandler(c: Context<{ Bindings: Env }>) {
       return c.json({ success: false, error: 'Current password is incorrect' }, 400)
     }
 
+    // 检查新密码不能与旧密码相同
+    if (await compare(data.new_password, user.password_hash)) {
+      return c.json({ success: false, error: 'New password cannot be the same as current password' }, 400)
+    }
+
     // 更新密码
-    const newPasswordHash = await hash(data.new_password, 10)
+    const newPasswordHash = await hash(data.new_password, 12)
     await c.env.DB
       .prepare('UPDATE users SET password_hash = ?, updated_at = datetime(\'now\') WHERE id = ?')
       .bind(newPasswordHash, currentUser.sub)
       .run()
 
+    // 撤销用户所有会话（强制重新登录）
+    await revokeAllUserSessions(c.env.KV, currentUser.sub)
+
     await logAudit(c, currentUser.sub, 'change_password', 'user', { user_id: currentUser.sub })
 
     return c.json({
       success: true,
-      message: 'Password changed successfully',
+      message: 'Password changed successfully. Please login again.',
     })
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -529,5 +548,66 @@ export async function deleteOtherSessionsHandler(c: Context<{ Bindings: Env }>) 
   return c.json({
     success: true,
     message: 'All other sessions have been signed out',
+  })
+}
+
+// ==================== Account Lockout ====================
+
+/**
+ * 获取用户锁定状态
+ */
+export async function getUserLockoutHandler(c: Context<{ Bindings: Env }>) {
+  const id = c.req.param('id') as string
+
+  // 获取用户邮箱
+  const user = await c.env.DB
+    .prepare('SELECT id, email FROM users WHERE id = ?')
+    .bind(id)
+    .first<{ id: number; email: string }>()
+
+  if (!user) {
+    return c.json({ success: false, error: 'User not found' }, 404)
+  }
+
+  const lockoutInfo = await getLockoutInfo(c.env.KV, user.email)
+
+  return c.json({
+    success: true,
+    data: {
+      user_id: user.id,
+      email: user.email,
+      lockout: lockoutInfo,
+    },
+  })
+}
+
+/**
+ * 解锁用户账户
+ */
+export async function unlockUserHandler(c: Context<{ Bindings: Env }>) {
+  const id = c.req.param('id') as string
+  const currentUser = c.get('user')
+
+  // 获取用户邮箱
+  const user = await c.env.DB
+    .prepare('SELECT id, email FROM users WHERE id = ?')
+    .bind(id)
+    .first<{ id: number; email: string }>()
+
+  if (!user) {
+    return c.json({ success: false, error: 'User not found' }, 404)
+  }
+
+  // 解锁账户
+  await unlockAccount(c.env.KV, user.email)
+
+  await logAudit(c, currentUser.sub, 'unlock_account', 'user', {
+    user_id: id,
+    email: user.email,
+  })
+
+  return c.json({
+    success: true,
+    message: 'Account unlocked successfully',
   })
 }

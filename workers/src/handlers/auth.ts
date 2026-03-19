@@ -3,16 +3,19 @@ import { SignJWT, jwtVerify } from 'jose'
 import { hash, compare } from 'bcryptjs'
 import { z } from 'zod'
 import type { Env, User } from '../types'
+import { logAudit } from '../utils/audit'
+import { passwordSchema, validatePassword } from '../utils/password'
+import { checkLockout, recordFailedAttempt, clearFailedAttempts } from '../utils/lockout'
 
 // 验证 schema
 const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(1),
 })
 
 const registerSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(8),
+  password: passwordSchema,
   role: z.enum(['admin', 'operator', 'viewer']).optional(),
 })
 
@@ -24,7 +27,9 @@ async function generateToken(
   secret: Uint8Array,
   expiresIn: string
 ): Promise<string> {
-  return await new SignJWT(payload)
+  // Convert sub to string for JWT spec compliance
+  const jwtPayload = { ...payload, sub: String(payload.sub) }
+  return await new SignJWT(jwtPayload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(expiresIn)
@@ -39,6 +44,25 @@ export async function loginHandler(c: Context<{ Bindings: Env }>) {
     const body = await c.req.json()
     const { email, password } = loginSchema.parse(body)
 
+    // 检查账户锁定状态
+    const lockoutStatus = await checkLockout(c.env.KV, email)
+    if (lockoutStatus.locked) {
+      await logAudit(c, undefined, 'login_attempt_locked', 'auth', {
+        email,
+        ip: c.req.header('CF-Connecting-IP'),
+        locked_until: lockoutStatus.lockedUntil,
+      })
+
+      return c.json({
+        success: false,
+        error: 'Account temporarily locked due to too many failed attempts',
+        locked_until: lockoutStatus.lockedUntil,
+        retry_after: lockoutStatus.lockedUntil
+          ? Math.ceil((new Date(lockoutStatus.lockedUntil).getTime() - Date.now()) / 1000)
+          : undefined,
+      }, 423) // 423 Locked
+    }
+
     // 查找用户
     const user = await c.env.DB
       .prepare('SELECT * FROM users WHERE email = ? AND enabled = 1')
@@ -46,14 +70,47 @@ export async function loginHandler(c: Context<{ Bindings: Env }>) {
       .first<User>()
 
     if (!user || !user.password_hash) {
-      return c.json({ success: false, error: 'Invalid credentials' }, 401)
+      // 记录失败尝试
+      const newStatus = await recordFailedAttempt(c.env.KV, email)
+
+      await logAudit(c, undefined, 'login_failed', 'auth', {
+        email,
+        ip: c.req.header('CF-Connecting-IP'),
+        reason: 'user_not_found',
+        attempts: newStatus.attempts,
+      })
+
+      return c.json({
+        success: false,
+        error: 'Invalid credentials',
+        remaining_attempts: newStatus.remainingAttempts,
+        account_locked: newStatus.locked,
+      }, 401)
     }
 
     // 验证密码
     const valid = await compare(password, user.password_hash)
     if (!valid) {
-      return c.json({ success: false, error: 'Invalid credentials' }, 401)
+      // 记录失败尝试
+      const newStatus = await recordFailedAttempt(c.env.KV, email)
+
+      await logAudit(c, user.id, 'login_failed', 'auth', {
+        email,
+        ip: c.req.header('CF-Connecting-IP'),
+        reason: 'invalid_password',
+        attempts: newStatus.attempts,
+      })
+
+      return c.json({
+        success: false,
+        error: 'Invalid credentials',
+        remaining_attempts: newStatus.remainingAttempts,
+        account_locked: newStatus.locked,
+      }, 401)
     }
+
+    // 登录成功，清除失败尝试记录
+    await clearFailedAttempts(c.env.KV, email)
 
     // 生成 JWT
     const secret = new TextEncoder().encode(c.env.JWT_SECRET)
@@ -110,6 +167,17 @@ export async function registerHandler(c: Context<{ Bindings: Env }>) {
     const body = await c.req.json()
     const { email, password, role } = registerSchema.parse(body)
 
+    // 额外的密码复杂度验证
+    const passwordValidation = validatePassword(password)
+    if (!passwordValidation.valid) {
+      return c.json({
+        success: false,
+        error: 'Password does not meet complexity requirements',
+        details: passwordValidation.errors,
+        strength: passwordValidation.strength,
+      }, 400)
+    }
+
     // 检查用户是否已存在
     const existing = await c.env.DB
       .prepare('SELECT id FROM users WHERE email = ?')
@@ -121,7 +189,7 @@ export async function registerHandler(c: Context<{ Bindings: Env }>) {
     }
 
     // 哈希密码
-    const passwordHash = await hash(password, 10)
+    const passwordHash = await hash(password, 12)
 
     // 创建用户
     const result = await c.env.DB
@@ -195,15 +263,54 @@ export async function refreshHandler(c: Context<{ Bindings: Env }>) {
 
 /**
  * 登出
+ * 将 Token 加入黑名单，使其失效
  */
 export async function logoutHandler(c: Context<{ Bindings: Env }>) {
-  // 可以在这里实现 token 黑名单 (使用 KV)
-  // await c.env.KV.put(`blacklist:${token}`, '1', { expirationTtl: 86400 })
+  const authHeader = c.req.header('Authorization')
 
-  return c.json({
-    success: true,
-    message: 'Logged out successfully',
-  })
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ success: false, error: 'No token provided' }, 400)
+  }
+
+  const token = authHeader.substring(7)
+
+  try {
+    // 解析 Token 获取过期时间
+    const secret = new TextEncoder().encode(c.env.JWT_SECRET)
+    const { payload } = await jwtVerify(token, secret)
+
+    // 计算剩余有效时间
+    const now = Math.floor(Date.now() / 1000)
+    const ttl = (payload.exp || now) - now
+
+    // 将 Token 加入黑名单
+    // 使用 Token 的剩余有效期作为 KV 的 TTL
+    if (ttl > 0) {
+      await c.env.KV.put(`blacklist:${token}`, JSON.stringify({
+        user_id: payload.sub,
+        revoked_at: new Date().toISOString(),
+      }), {
+        expirationTtl: ttl,
+      })
+    }
+
+    // 记录审计日志
+    const user = c.get('user')
+    if (user) {
+      await logAudit(c, user.sub, 'logout', 'auth', { ip: c.req.header('CF-Connecting-IP') })
+    }
+
+    return c.json({
+      success: true,
+      message: 'Logged out successfully',
+    })
+  } catch (err) {
+    // Token 已过期或无效，仍然返回成功
+    return c.json({
+      success: true,
+      message: 'Logged out successfully',
+    })
+  }
 }
 
 /**
@@ -228,31 +335,5 @@ export async function meHandler(c: Context<{ Bindings: Env }>) {
 }
 
 /**
- * 记录审计日志
+ * 记录审计日志 - 已移至 utils/audit.ts
  */
-async function logAudit(
-  c: Context<{ Bindings: Env }>,
-  userId: number | undefined,
-  action: string,
-  resource: string,
-  details?: Record<string, unknown>
-) {
-  try {
-    await c.env.DB
-      .prepare(`
-        INSERT INTO audit_logs (user_id, action, resource, ip, user_agent, details)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `)
-      .bind(
-        userId || null,
-        action,
-        resource,
-        c.req.header('CF-Connecting-IP') || null,
-        c.req.header('User-Agent') || null,
-        details ? JSON.stringify(details) : null
-      )
-      .run()
-  } catch (err) {
-    console.error('Failed to log audit:', err)
-  }
-}

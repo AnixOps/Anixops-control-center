@@ -16,17 +16,8 @@ export interface Env {
   // R2 存储桶
   R2: R2Bucket
 
-  // Durable Objects
-  WEBSOCKET_SERVER: DurableObjectNamespace
-}
-
-// 扩展Context类型以包含executionCtx
-declare module 'hono' {
-  interface Context {
-    executionCtx: {
-      waitUntil: (promise: Promise<unknown>) => void
-    }
-  }
+  // Durable Objects - 暂时禁用
+  // WEBSOCKET_SERVER: DurableObjectNamespace
 }
 
 // 用户类型
@@ -70,8 +61,104 @@ export interface Playbook {
   name: string
   storage_key: string
   description?: string
+  category?: string
+  source?: string
+  github_repo?: string
+  github_path?: string
+  version?: string
+  variables?: string
+  author?: string
+  tags?: string
   created_at: string
   updated_at: string
+}
+
+// 任务类型
+export interface Task {
+  id: number
+  task_id: string
+  playbook_id: number
+  playbook_name: string
+  status: 'pending' | 'running' | 'success' | 'failed' | 'cancelled'
+  trigger_type: 'manual' | 'scheduled' | 'webhook' | 'api'
+  triggered_by?: number
+  target_nodes?: string
+  variables?: string
+  result?: string
+  error?: string
+  started_at?: string
+  completed_at?: string
+  created_at: string
+}
+
+// 任务日志类型
+export interface TaskLog {
+  id: number
+  task_id: string
+  node_id?: number
+  node_name?: string
+  level: 'debug' | 'info' | 'warning' | 'error'
+  message: string
+  metadata?: string
+  created_at: string
+}
+
+// 调度类型
+export interface Schedule {
+  id: number
+  name: string
+  playbook_id: number
+  playbook_name: string
+  cron: string
+  timezone?: string
+  target_nodes?: string
+  variables?: string
+  enabled: boolean
+  last_run?: string
+  next_run?: string
+  last_task_id?: string
+  created_by?: number
+  created_at: string
+  updated_at: string
+}
+
+// 节点组类型
+export interface NodeGroup {
+  id: number
+  name: string
+  description?: string
+  parent_id?: number
+  created_at: string
+}
+
+// 插件类型
+export interface Plugin {
+  id: number
+  name: string
+  display_name?: string
+  version?: string
+  description?: string
+  author?: string
+  type?: string
+  enabled: boolean
+  config?: string
+  permissions?: string
+  installed_at: string
+  updated_at?: string
+}
+
+// 通知类型
+export interface Notification {
+  id: number
+  user_id: number
+  type: 'info' | 'success' | 'warning' | 'error' | 'task' | 'system'
+  title: string
+  message?: string
+  resource_type?: string
+  resource_id?: string
+  read: boolean
+  action_url?: string
+  created_at: string
 }
 
 // 审计日志类型
