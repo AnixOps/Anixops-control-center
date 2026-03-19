@@ -20,7 +20,7 @@ export const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
   requireLowercase: true,
   requireNumber: true,
   requireSpecialChar: true,
-  specialChars: '!@#$%^&*()_+-=[]{}|;:\'",.<>?/~`',
+  specialChars: '!@#$%^&*()_+=[]{}|;:\'",.<>?/~`-',
 }
 
 /**
@@ -60,7 +60,9 @@ export function validatePassword(password: string, policy: PasswordPolicy = DEFA
 
   // 特殊字符检查
   if (policy.requireSpecialChar) {
-    const specialCharRegex = new RegExp(`[${policy.specialChars.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}]`)
+    // Escape special regex chars and put - at the end to avoid range interpretation
+    const escaped = policy.specialChars.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/-/g, '\\-')
+    const specialCharRegex = new RegExp(`[${escaped}]`)
     if (!specialCharRegex.test(password)) {
       errors.push(`Password must contain at least one special character (${policy.specialChars.slice(0, 10)}...)`)
     }
