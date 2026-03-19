@@ -13,10 +13,53 @@ local_protocol = "http"
 ENVIRONMENT = "development"
 JWT_EXPIRE = "86400"
 
+# ==================== 环境配置 ====================
+
+# Staging 测试环境
+[env.staging]
+name = "anixops-api-staging"
+vars = { ENVIRONMENT = "staging", JWT_EXPIRE = "86400" }
+
+# Staging D1 数据库 (使用独立的测试数据库)
+[[env.staging.d1_databases]]
+binding = "DB"
+database_name = "anixops-db-staging"
+database_id = "staging-db-id-placeholder"
+migrations_dir = "migrations"
+
+# Staging KV 命名空间
+[[env.staging.kv_namespaces]]
+binding = "KV"
+id = "staging-kv-id-placeholder"
+
+# Staging R2 存储桶
+[[env.staging.r2_buckets]]
+binding = "R2"
+bucket_name = "anixops-files-staging"
+
 # 生产环境
 [env.production]
 name = "anixops-api-prod"
-vars = { ENVIRONMENT = "production" }
+vars = { ENVIRONMENT = "production", JWT_EXPIRE = "86400" }
+
+# Production D1 数据库
+[[env.production.d1_databases]]
+binding = "DB"
+database_name = "anixops-db"
+database_id = "1fd85576-c08d-44f3-a0fb-ec5fc845f1e5"
+migrations_dir = "migrations"
+
+# Production KV 命名空间
+[[env.production.kv_namespaces]]
+binding = "KV"
+id = "35a39ccc4cea47e89aa8b1459f85e1cf"
+
+# Production R2 存储桶
+[[env.production.r2_buckets]]
+binding = "R2"
+bucket_name = "anixops-files"
+
+# ==================== 默认绑定（本地开发） ====================
 
 # D1 数据库绑定
 [[d1_databases]]
