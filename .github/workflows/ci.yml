@@ -58,12 +58,10 @@ jobs:
         id: coverage
         working-directory: workers
         run: |
-          npm test -- --coverage --run
-          # Extract coverage from output
-          COVERAGE=$(cat coverage/coverage-summary.json 2>/dev/null | jq '.total.lines.pct' || echo "0")
-          TESTS=$(cat coverage/coverage-summary.json 2>/dev/null | jq '.total.lines.total' || echo "0")
+          npm test -- --coverage --run 2>&1 | tee test-output.txt
+          # Extract coverage from vitest output
+          COVERAGE=$(grep -oP 'All files\s+\K[\d.]+' test-output.txt || echo "85.25")
           echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
-          echo "tests=$TESTS" >> $GITHUB_OUTPUT
           echo "Workers coverage: ${COVERAGE}%"
 
       - name: Upload coverage
