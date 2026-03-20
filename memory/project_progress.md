@@ -7,9 +7,21 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `anixops-v1.0.0-rc.26`
+**Version**: `v2.0.0-rc.2`
 **Date**: 2026-03-20
-**Status**: ✅ All phases complete
+**Status**: ✅ Released
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.2
+
+## Recent Changes (v2.0.0-rc.2)
+- Update permissions: all authenticated users can add nodes
+- Show Users menu only for admin role
+- Display user role badge in sidebar (ADMIN/OPERATOR/VIEWER)
+- Upgrade Flutter to 3.41.5, Dart 3.11.3
+- Add web platform support for mobile app
+- Fix deprecated APIs (CardTheme → CardThemeData, withOpacity → withValues)
+- Configure custom domain api.anixops.com
+- API: 342 tests passed, 85.25% coverage
+- Build: APK (53.2MB), Web
 
 ## Phase Summary
 
