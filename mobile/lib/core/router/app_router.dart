@@ -15,6 +15,7 @@ import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/playbooks/presentation/pages/playbooks_page.dart';
 import '../../features/tasks/presentation/pages/tasks_page.dart';
+import '../../features/schedules/presentation/pages/schedules_page.dart';
 
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../shared/presentation/pages/main_shell.dart';
@@ -75,6 +76,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/tasks',
             name: 'tasks',
             builder: (context, state) => const TasksPage(),
+          ),
+          GoRoute(
+            path: '/schedules',
+            name: 'schedules',
+            builder: (context, state) => const SchedulesPage(),
           ),
           GoRoute(
             path: '/plugins',

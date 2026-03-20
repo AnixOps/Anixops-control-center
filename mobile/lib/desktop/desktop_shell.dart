@@ -35,14 +35,18 @@ class _DesktopShellState extends State<DesktopShell> {
       _selectedIndex = 1;
     } else if (location.startsWith('/playbooks')) {
       _selectedIndex = 2;
-    } else if (location.startsWith('/plugins')) {
+    } else if (location.startsWith('/tasks')) {
       _selectedIndex = 3;
-    } else if (location.startsWith('/users')) {
+    } else if (location.startsWith('/schedules')) {
       _selectedIndex = 4;
-    } else if (location.startsWith('/logs')) {
+    } else if (location.startsWith('/plugins')) {
       _selectedIndex = 5;
-    } else if (location.startsWith('/settings')) {
+    } else if (location.startsWith('/users')) {
       _selectedIndex = 6;
+    } else if (location.startsWith('/logs')) {
+      _selectedIndex = 7;
+    } else if (location.startsWith('/settings')) {
+      _selectedIndex = 8;
     }
   }
 
