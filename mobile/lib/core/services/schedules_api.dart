@@ -74,7 +74,7 @@ class Schedule {
       timezone: json['timezone'] as String? ?? 'UTC',
       targetNodes: nodes,
       variables: vars,
-      enabled: (json['enabled'] as int?) == 1 || json['enabled'] == true,
+      enabled: _parseEnabled(json['enabled']),
       nextRun: json['next_run'] != null
           ? DateTime.tryParse(json['next_run'] as String)
           : null,
@@ -91,6 +91,13 @@ class Schedule {
           ? DateTime.tryParse(json['updated_at'] as String)
           : null,
     );
+  }
+
+  static bool _parseEnabled(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    return false;
   }
 
   String get cronDescription {
