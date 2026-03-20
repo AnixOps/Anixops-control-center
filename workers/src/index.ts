@@ -38,6 +38,9 @@ import {
   regenerateRecoveryCodesHandler,
   adminDisableMFAHandler,
 } from './handlers/mfa'
+import { batchOperationsHandler, bulkNodeStatusHandler } from './handlers/batch'
+import { prometheusMetricsHandler, detailedHealthHandler, readinessHandler as k8sReadinessHandler, livenessHandler } from './handlers/metrics'
+import { cacheMiddleware } from './middleware/cache'
 
 // Middleware
 import { authMiddleware, rbacMiddleware } from './middleware/auth'
@@ -72,7 +75,10 @@ app.use('*', cors({
 
 // 健康检查
 app.get('/health', healthHandler)
+app.get('/health/detailed', detailedHealthHandler)
 app.get('/readiness', readinessHandler)
+app.get('/liveness', livenessHandler)
+app.get('/metrics', prometheusMetricsHandler)
 
 // 认证 (公开)
 app.post('/api/v1/auth/login', rateLimitMiddleware({ windowMs: 60000, max: 5 }), loginHandler)
@@ -113,12 +119,13 @@ app.post('/api/v1/ssh/import', authMiddleware, rbacMiddleware(['admin', 'operato
 app.post('/api/v1/ssh/detect', authMiddleware, rbacMiddleware(['admin', 'operator']), detectServerTypeHandler)
 
 // 节点管理
-app.get('/api/v1/nodes', authMiddleware, listNodesHandler)
+app.get('/api/v1/nodes', authMiddleware, cacheMiddleware({ ttl: 30, private: true }), listNodesHandler)
 app.get('/api/v1/nodes/:id', authMiddleware, getNodeHandler)
 app.get('/api/v1/nodes/:id/stats', authMiddleware, getNodeStatsHandler)
 app.get('/api/v1/nodes/:id/logs', authMiddleware, getNodeLogsHandler)
 app.post('/api/v1/nodes', authMiddleware, rbacMiddleware(['admin', 'operator']), createNodeHandler)
 app.post('/api/v1/nodes/bulk', authMiddleware, rbacMiddleware(['admin', 'operator']), bulkActionHandler)
+app.post('/api/v1/nodes/bulk-status', authMiddleware, rbacMiddleware(['admin', 'operator']), bulkNodeStatusHandler)
 app.post('/api/v1/nodes/:id/start', authMiddleware, rbacMiddleware(['admin', 'operator']), startNodeHandler)
 app.post('/api/v1/nodes/:id/stop', authMiddleware, rbacMiddleware(['admin', 'operator']), stopNodeHandler)
 app.post('/api/v1/nodes/:id/restart', authMiddleware, rbacMiddleware(['admin', 'operator']), restartNodeHandler)
@@ -218,6 +225,9 @@ app.post('/api/v1/mfa/disable', authMiddleware, disableMFAHandler)
 app.post('/api/v1/mfa/verify', authMiddleware, verifyMFAHandler)
 app.post('/api/v1/mfa/recovery-codes', authMiddleware, regenerateRecoveryCodesHandler)
 app.post('/api/v1/admin/users/:id/mfa/disable', authMiddleware, rbacMiddleware(['admin']), adminDisableMFAHandler)
+
+// ==================== 批量操作 ====================
+app.post('/api/v1/batch', authMiddleware, rbacMiddleware(['admin', 'operator']), batchOperationsHandler)
 
 // ==================== WebSocket ====================
 // WebSocket 暂时禁用 - Durable Object 有问题
