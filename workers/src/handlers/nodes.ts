@@ -26,22 +26,23 @@ export async function listNodesHandler(c: Context<{ Bindings: Env }>) {
   const perPage = parseInt(c.req.query('per_page') || '20', 10)
   const status = c.req.query('status')
 
-  let query = 'SELECT * FROM nodes'
+  // 构建查询条件
+  let whereClause = ''
   const params: (string | number)[] = []
 
   if (status) {
-    query += ' WHERE status = ?'
+    whereClause = ' WHERE status = ?'
     params.push(status)
   }
 
   // 获取总数
   const countResult = await c.env.DB
-    .prepare(`SELECT COUNT(*) as total FROM (${query})`)
+    .prepare(`SELECT COUNT(*) as total FROM nodes${whereClause}`)
     .bind(...params)
     .first<{ total: number }>()
 
   // 获取分页数据
-  query += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  const query = `SELECT * FROM nodes${whereClause} ORDER BY created_at DESC LIMIT ? OFFSET ?`
   params.push(perPage, (page - 1) * perPage)
 
   const result = await c.env.DB

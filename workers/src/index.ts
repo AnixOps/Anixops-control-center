@@ -127,6 +127,8 @@ app.use('*', cors({
       'http://localhost:5173',
       'https://anixops.pages.dev',
       'https://anixops.dev',
+      'https://www.anixops.dev',
+      'https://api.anixops.com',
     ]
     if (allowed.includes(origin)) return origin
     return allowed[0]
@@ -180,23 +182,23 @@ app.delete('/api/v1/users/:id', authMiddleware, rbacMiddleware(['admin']), delet
 app.get('/api/v1/users/:id/lockout', authMiddleware, rbacMiddleware(['admin']), getUserLockoutHandler)
 app.post('/api/v1/users/:id/unlock', authMiddleware, rbacMiddleware(['admin']), unlockUserHandler)
 
-// SSH导入
-app.post('/api/v1/ssh/test', authMiddleware, rbacMiddleware(['admin', 'operator']), testConnectionHandler)
-app.post('/api/v1/ssh/import', authMiddleware, rbacMiddleware(['admin', 'operator']), importServerHandler)
-app.post('/api/v1/ssh/detect', authMiddleware, rbacMiddleware(['admin', 'operator']), detectServerTypeHandler)
+// SSH导入 - 所有登录用户都可以导入服务器
+app.post('/api/v1/ssh/test', authMiddleware, testConnectionHandler)
+app.post('/api/v1/ssh/import', authMiddleware, importServerHandler)
+app.post('/api/v1/ssh/detect', authMiddleware, detectServerTypeHandler)
 
-// 节点管理
-app.get('/api/v1/nodes', authMiddleware, cacheMiddleware({ ttl: 30, private: true }), listNodesHandler)
+// 节点管理 - 所有登录用户可查看和添加，operator/admin可操作，仅admin可删除
+app.get('/api/v1/nodes', authMiddleware, listNodesHandler)
 app.get('/api/v1/nodes/:id', authMiddleware, getNodeHandler)
 app.get('/api/v1/nodes/:id/stats', authMiddleware, getNodeStatsHandler)
 app.get('/api/v1/nodes/:id/logs', authMiddleware, getNodeLogsHandler)
-app.post('/api/v1/nodes', authMiddleware, rbacMiddleware(['admin', 'operator']), createNodeHandler)
+app.post('/api/v1/nodes', authMiddleware, createNodeHandler)  // 所有登录用户可添加
 app.post('/api/v1/nodes/bulk', authMiddleware, rbacMiddleware(['admin', 'operator']), bulkActionHandler)
 app.post('/api/v1/nodes/bulk-status', authMiddleware, rbacMiddleware(['admin', 'operator']), bulkNodeStatusHandler)
 app.post('/api/v1/nodes/:id/start', authMiddleware, rbacMiddleware(['admin', 'operator']), startNodeHandler)
 app.post('/api/v1/nodes/:id/stop', authMiddleware, rbacMiddleware(['admin', 'operator']), stopNodeHandler)
 app.post('/api/v1/nodes/:id/restart', authMiddleware, rbacMiddleware(['admin', 'operator']), restartNodeHandler)
-app.post('/api/v1/nodes/:id/test', authMiddleware, testNodeConnectionHandler)
+app.post('/api/v1/nodes/:id/test', authMiddleware, testNodeConnectionHandler)  // 所有用户可测试连接
 app.post('/api/v1/nodes/:id/sync', authMiddleware, rbacMiddleware(['admin', 'operator']), syncNodeHandler)
 app.put('/api/v1/nodes/:id', authMiddleware, rbacMiddleware(['admin', 'operator']), updateNodeHandler)
 app.delete('/api/v1/nodes/:id', authMiddleware, rbacMiddleware(['admin']), deleteNodeHandler)

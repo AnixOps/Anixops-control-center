@@ -35,9 +35,10 @@ function generateCacheKey(
 
   // Include user ID for private cache
   if (options.private) {
-    const user = c.get('user')
-    if (user?.id) {
-      parts.push(`user:${user.id}`)
+    const user = c.get('user') as { sub?: number; id?: number } | undefined
+    const userId = user?.sub || user?.id
+    if (userId) {
+      parts.push(`user:${userId}`)
     }
   }
 
