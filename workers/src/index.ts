@@ -54,6 +54,16 @@ import {
   getClusterOverviewHandler,
   getNamespaceDetailsHandler,
 } from './handlers/kubernetes'
+import {
+  listMeshServicesHandler,
+  listVirtualServicesHandler,
+  listDestinationRulesHandler,
+  listGatewaysHandler,
+  configureTrafficSplitHandler,
+  configureCircuitBreakerHandler,
+  injectFaultHandler,
+  getMeshOverviewHandler,
+} from './handlers/istio'
 
 // Middleware
 import { authMiddleware, rbacMiddleware } from './middleware/auth'
@@ -254,6 +264,16 @@ app.get('/api/v1/kubernetes/events', authMiddleware, rbacMiddleware(['admin', 'o
 app.get('/api/v1/kubernetes/namespaces/:namespace/pods/:pod/logs', authMiddleware, rbacMiddleware(['admin', 'operator']), getPodLogsHandler)
 app.post('/api/v1/kubernetes/namespaces/:namespace/deployments/:name/scale', authMiddleware, rbacMiddleware(['admin']), scaleDeploymentHandler)
 app.post('/api/v1/kubernetes/namespaces/:namespace/deployments/:name/restart', authMiddleware, rbacMiddleware(['admin', 'operator']), restartDeploymentHandler)
+
+// ==================== Istio 服务网格 ====================
+app.get('/api/v1/mesh/overview', authMiddleware, rbacMiddleware(['admin', 'operator']), getMeshOverviewHandler)
+app.get('/api/v1/mesh/services', authMiddleware, rbacMiddleware(['admin', 'operator']), listMeshServicesHandler)
+app.get('/api/v1/mesh/virtualservices', authMiddleware, rbacMiddleware(['admin', 'operator']), listVirtualServicesHandler)
+app.get('/api/v1/mesh/destinationrules', authMiddleware, rbacMiddleware(['admin', 'operator']), listDestinationRulesHandler)
+app.get('/api/v1/mesh/gateways', authMiddleware, rbacMiddleware(['admin', 'operator']), listGatewaysHandler)
+app.post('/api/v1/mesh/traffic/split', authMiddleware, rbacMiddleware(['admin']), configureTrafficSplitHandler)
+app.post('/api/v1/mesh/circuit-breaker', authMiddleware, rbacMiddleware(['admin']), configureCircuitBreakerHandler)
+app.post('/api/v1/mesh/fault/inject', authMiddleware, rbacMiddleware(['admin']), injectFaultHandler)
 
 // ==================== WebSocket ====================
 // WebSocket 暂时禁用 - Durable Object 有问题
