@@ -7,6 +7,7 @@ import 'package:anixops_mobile/core/services/ssh_api.dart';
 import 'package:anixops_mobile/core/services/playbooks_api.dart';
 import 'package:anixops_mobile/core/services/tasks_api.dart';
 import 'package:anixops_mobile/core/services/mfa_api.dart';
+import 'package:anixops_mobile/core/services/schedules_api.dart';
 
 /// Central API client providing access to all API services
 class ApiClient {
@@ -19,6 +20,7 @@ class ApiClient {
   late final PlaybooksApi playbooks;
   late final TasksApi tasks;
   late final MFAApi mfa;
+  late final SchedulesApi schedules;
   late final TokensApi tokens;
   late final SessionsApi sessions;
 
@@ -69,6 +71,7 @@ class ApiClient {
     playbooks = PlaybooksApi(_dio);
     tasks = TasksApi(_dio);
     mfa = MFAApi(_dio);
+    schedules = SchedulesApi(_dio);
     tokens = TokensApi(_dio);
     sessions = SessionsApi(_dio);
   }
