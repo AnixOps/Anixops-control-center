@@ -154,10 +154,10 @@ class DesktopSidebar extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: userRole == 'admin'
-                            ? Colors.red.withOpacity(0.2)
+                            ? Colors.red.withValues(alpha: 0.2)
                             : userRole == 'operator'
-                                ? Colors.orange.withOpacity(0.2)
-                                : Colors.blue.withOpacity(0.2),
+                                ? Colors.orange.withValues(alpha: 0.2)
+                                : Colors.blue.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -281,7 +281,7 @@ class _NavItem extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: isSelected ? AppTheme.primaryColor.withOpacity(0.15) : Colors.transparent,
+            color: isSelected ? AppTheme.primaryColor.withValues(alpha: 0.15) : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Row(
