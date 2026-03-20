@@ -5,6 +5,7 @@ import 'privacy_policy_page.dart';
 import 'terms_of_service_page.dart';
 import 'profile_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/providers/locale_provider.dart';
 
 // Settings State
 class SettingsState {
@@ -424,6 +425,7 @@ class SettingsPage extends ConsumerWidget {
               groupValue: currentValue,
               onChanged: (value) {
                 ref.read(settingsProvider.notifier).setTheme(value!);
+                ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.light);
                 Navigator.pop(context);
               },
             ),
@@ -433,6 +435,7 @@ class SettingsPage extends ConsumerWidget {
               groupValue: currentValue,
               onChanged: (value) {
                 ref.read(settingsProvider.notifier).setTheme(value!);
+                ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark);
                 Navigator.pop(context);
               },
             ),
@@ -442,6 +445,7 @@ class SettingsPage extends ConsumerWidget {
               groupValue: currentValue,
               onChanged: (value) {
                 ref.read(settingsProvider.notifier).setTheme(value!);
+                ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.system);
                 Navigator.pop(context);
               },
             ),
@@ -465,15 +469,47 @@ class SettingsPage extends ConsumerWidget {
               groupValue: currentValue,
               onChanged: (value) {
                 ref.read(settingsProvider.notifier).setLanguage(value!);
+                ref.read(localeProvider.notifier).setLocale(const Locale('en'));
                 Navigator.pop(context);
               },
             ),
             RadioListTile<String>(
-              title: const Text('中文'),
+              title: const Text('简体中文'),
               value: 'zh',
               groupValue: currentValue,
               onChanged: (value) {
                 ref.read(settingsProvider.notifier).setLanguage(value!);
+                ref.read(localeProvider.notifier).setLocale(const Locale('zh'));
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('日本語'),
+              value: 'ja',
+              groupValue: currentValue,
+              onChanged: (value) {
+                ref.read(settingsProvider.notifier).setLanguage(value!);
+                ref.read(localeProvider.notifier).setLocale(const Locale('ja', 'JP'));
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('繁體中文'),
+              value: 'zh_TW',
+              groupValue: currentValue,
+              onChanged: (value) {
+                ref.read(settingsProvider.notifier).setLanguage(value!);
+                ref.read(localeProvider.notifier).setLocale(const Locale('zh', 'TW'));
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('العربية'),
+              value: 'ar',
+              groupValue: currentValue,
+              onChanged: (value) {
+                ref.read(settingsProvider.notifier).setLanguage(value!);
+                ref.read(localeProvider.notifier).setLocale(const Locale('ar', 'SA'));
                 Navigator.pop(context);
               },
             ),
