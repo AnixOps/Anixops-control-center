@@ -77,6 +77,21 @@ import {
   getNodeLogsV2Handler,
   getServiceLogsHandler,
 } from './handlers/elasticsearch'
+import {
+  listScalingPoliciesHandler,
+  getScalingPolicyHandler,
+  createScalingPolicyHandler,
+  updateScalingPolicyHandler,
+  deleteScalingPolicyHandler,
+  evaluateScalingPolicyHandler,
+  executeScalingActionHandler,
+  getScalingHistoryHandler,
+  checkHealthHandler,
+  getRecommendedReplicasHandler,
+  runScalingCheckHandler,
+  toggleScalingPolicyHandler,
+  getScalingMetricsHandler,
+} from './handlers/autoscaling'
 
 // Middleware
 import { authMiddleware, rbacMiddleware } from './middleware/auth'
@@ -300,6 +315,21 @@ app.delete('/api/v1/logs/old', authMiddleware, rbacMiddleware(['admin']), delete
 app.get('/api/v1/logs/trace/:traceId', authMiddleware, rbacMiddleware(['admin', 'operator']), getTraceLogsHandler)
 app.get('/api/v1/logs/node/:nodeId', authMiddleware, rbacMiddleware(['admin', 'operator']), getNodeLogsV2Handler)
 app.get('/api/v1/logs/service/:service', authMiddleware, rbacMiddleware(['admin', 'operator']), getServiceLogsHandler)
+
+// ==================== Auto-Scaling ====================
+app.get('/api/v1/scaling/policies', authMiddleware, rbacMiddleware(['admin', 'operator']), listScalingPoliciesHandler)
+app.post('/api/v1/scaling/policies', authMiddleware, rbacMiddleware(['admin']), createScalingPolicyHandler)
+app.get('/api/v1/scaling/policies/:id', authMiddleware, rbacMiddleware(['admin', 'operator']), getScalingPolicyHandler)
+app.put('/api/v1/scaling/policies/:id', authMiddleware, rbacMiddleware(['admin']), updateScalingPolicyHandler)
+app.delete('/api/v1/scaling/policies/:id', authMiddleware, rbacMiddleware(['admin']), deleteScalingPolicyHandler)
+app.post('/api/v1/scaling/policies/:id/toggle', authMiddleware, rbacMiddleware(['admin']), toggleScalingPolicyHandler)
+app.get('/api/v1/scaling/policies/:id/evaluate', authMiddleware, rbacMiddleware(['admin', 'operator']), evaluateScalingPolicyHandler)
+app.post('/api/v1/scaling/policies/:id/execute', authMiddleware, rbacMiddleware(['admin']), executeScalingActionHandler)
+app.get('/api/v1/scaling/policies/:id/history', authMiddleware, rbacMiddleware(['admin', 'operator']), getScalingHistoryHandler)
+app.get('/api/v1/scaling/policies/:id/recommend', authMiddleware, rbacMiddleware(['admin', 'operator']), getRecommendedReplicasHandler)
+app.get('/api/v1/scaling/policies/:id/metrics', authMiddleware, rbacMiddleware(['admin', 'operator']), getScalingMetricsHandler)
+app.get('/api/v1/scaling/health/:type/:id', authMiddleware, rbacMiddleware(['admin', 'operator']), checkHealthHandler)
+app.post('/api/v1/scaling/check', authMiddleware, rbacMiddleware(['admin']), runScalingCheckHandler)
 
 // ==================== WebSocket ====================
 // WebSocket 暂时禁用 - Durable Object 有问题
