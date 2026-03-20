@@ -19,6 +19,7 @@ class DesktopSidebar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
     final userEmail = authState.email ?? 'user@example.com';
+    final userRole = authState.role ?? 'viewer';
     final userName = userEmail.split('@').first;
 
     return Container(
@@ -36,11 +37,11 @@ class DesktopSidebar extends ConsumerWidget {
 
           // Navigation items
           Expanded(
-            child: _buildNavItems(context),
+            child: _buildNavItems(context, ref),
           ),
 
           // User profile section
-          _buildUserSection(context, ref, userName, userEmail),
+          _buildUserSection(context, ref, userName, userEmail, userRole),
         ],
       ),
     );
@@ -88,8 +89,10 @@ class DesktopSidebar extends ConsumerWidget {
     );
   }
 
-  Widget _buildNavItems(BuildContext context) {
-    final items = _getNavItems();
+  Widget _buildNavItems(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authStateProvider);
+    final userRole = authState.role ?? 'viewer';
+    final items = _getNavItems(userRole);
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -111,7 +114,7 @@ class DesktopSidebar extends ConsumerWidget {
     );
   }
 
-  Widget _buildUserSection(BuildContext context, WidgetRef ref, String userName, String userEmail) {
+  Widget _buildUserSection(BuildContext context, WidgetRef ref, String userName, String userEmail, String userRole) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -137,12 +140,40 @@ class DesktopSidebar extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  userName,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppTheme.darkText,
-                        fontWeight: FontWeight.w500,
+                Row(
+                  children: [
+                    Text(
+                      userName,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: AppTheme.darkText,
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: userRole == 'admin'
+                            ? Colors.red.withOpacity(0.2)
+                            : userRole == 'operator'
+                                ? Colors.orange.withOpacity(0.2)
+                                : Colors.blue.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
                       ),
+                      child: Text(
+                        userRole.toUpperCase(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: userRole == 'admin'
+                              ? Colors.red
+                              : userRole == 'operator'
+                                  ? Colors.orange
+                                  : Colors.blue,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 Text(
                   userEmail,
@@ -193,17 +224,28 @@ class DesktopSidebar extends ConsumerWidget {
     );
   }
 
-  List<_NavItemData> _getNavItems() {
-    return [
+  List<_NavItemData> _getNavItems(String userRole) {
+    // Base items available to all authenticated users
+    final items = <_NavItemData>[
       _NavItemData(Icons.dashboard_rounded, 'Dashboard', '/dashboard'),
       _NavItemData(Icons.dns_rounded, 'Nodes', '/nodes'),
       _NavItemData(Icons.play_circle_rounded, 'Playbooks', '/playbooks'),
       _NavItemData(Icons.extension_rounded, 'Plugins', '/plugins'),
-      _NavItemData(Icons.people_rounded, 'Users', '/users'),
+    ];
+
+    // Users management - admin only
+    if (userRole == 'admin') {
+      items.add(_NavItemData(Icons.people_rounded, 'Users', '/users'));
+    }
+
+    // Items available to all users
+    items.addAll([
       _NavItemData(Icons.description_rounded, 'Logs', '/logs'),
       _NavItemData(Icons.notifications_rounded, 'Notifications', '/notifications'),
       _NavItemData(Icons.settings_rounded, 'Settings', '/settings'),
-    ];
+    ]);
+
+    return items;
   }
 }
 

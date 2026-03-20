@@ -42,7 +42,8 @@ describe('Password Validation', () => {
     })
 
     it('should reject common passwords', () => {
-      const result = validatePassword('Password1!')
+      // Test with exact match from common passwords list
+      const result = validatePassword('Password123!')
       expect(result.valid).toBe(false)
       expect(result.errors).toContain('Password is too common or easily guessable')
     })

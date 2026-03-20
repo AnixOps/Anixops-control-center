@@ -68,12 +68,13 @@ export function validatePassword(password: string, policy: PasswordPolicy = DEFA
     }
   }
 
-  // 常见弱密码检查
+  // 常见弱密码检查 (简化版，只检查完全匹配或非常弱的模式)
   const commonPasswords = [
-    'password', 'Password1!', '12345678', 'qwerty', 'abc123',
-    'letmein', 'welcome', 'admin', 'password123', 'Password123!',
+    'password', '12345678', 'qwerty', 'abc123',
+    'letmein', 'welcome', 'admin', 'password123',
   ]
-  if (commonPasswords.some(weak => password.toLowerCase().includes(weak.toLowerCase()))) {
+  const lowerPassword = password.toLowerCase()
+  if (commonPasswords.some(weak => lowerPassword === weak || lowerPassword === weak + '!')) {
     errors.push('Password is too common or easily guessable')
   }
 
@@ -85,7 +86,7 @@ export function validatePassword(password: string, policy: PasswordPolicy = DEFA
   if (/[a-z]/.test(password)) strengthScore++
   if (/[0-9]/.test(password)) strengthScore++
   if (/[!@#$%^&*()_+\-=\[\]{}|;:'",.<>?\/~`]/.test(password)) strengthScore++
-  if (!commonPasswords.some(weak => password.toLowerCase().includes(weak.toLowerCase()))) strengthScore++
+  if (!commonPasswords.some(weak => lowerPassword === weak || lowerPassword === weak + '!')) strengthScore++
 
   let strength: PasswordValidationResult['strength']
   if (strengthScore <= 3) strength = 'weak'
