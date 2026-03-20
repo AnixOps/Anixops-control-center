@@ -64,6 +64,19 @@ import {
   injectFaultHandler,
   getMeshOverviewHandler,
 } from './handlers/istio'
+import {
+  searchLogsHandler,
+  getLogHandler,
+  indexLogHandler,
+  bulkIndexLogsHandler,
+  getLogStatsHandler,
+  deleteOldLogsHandler,
+  createLogIndexHandler,
+  exportLogsHandler,
+  getTraceLogsHandler,
+  getNodeLogsV2Handler,
+  getServiceLogsHandler,
+} from './handlers/elasticsearch'
 
 // Middleware
 import { authMiddleware, rbacMiddleware } from './middleware/auth'
@@ -274,6 +287,19 @@ app.get('/api/v1/mesh/gateways', authMiddleware, rbacMiddleware(['admin', 'opera
 app.post('/api/v1/mesh/traffic/split', authMiddleware, rbacMiddleware(['admin']), configureTrafficSplitHandler)
 app.post('/api/v1/mesh/circuit-breaker', authMiddleware, rbacMiddleware(['admin']), configureCircuitBreakerHandler)
 app.post('/api/v1/mesh/fault/inject', authMiddleware, rbacMiddleware(['admin']), injectFaultHandler)
+
+// ==================== Elasticsearch/ELK 日志 ====================
+app.get('/api/v1/logs', authMiddleware, rbacMiddleware(['admin', 'operator']), searchLogsHandler)
+app.get('/api/v1/logs/stats', authMiddleware, rbacMiddleware(['admin', 'operator']), getLogStatsHandler)
+app.get('/api/v1/logs/export', authMiddleware, rbacMiddleware(['admin']), exportLogsHandler)
+app.post('/api/v1/logs', authMiddleware, indexLogHandler)
+app.post('/api/v1/logs/bulk', authMiddleware, rbacMiddleware(['admin', 'operator']), bulkIndexLogsHandler)
+app.get('/api/v1/logs/:id', authMiddleware, rbacMiddleware(['admin', 'operator']), getLogHandler)
+app.post('/api/v1/logs/index', authMiddleware, rbacMiddleware(['admin']), createLogIndexHandler)
+app.delete('/api/v1/logs/old', authMiddleware, rbacMiddleware(['admin']), deleteOldLogsHandler)
+app.get('/api/v1/logs/trace/:traceId', authMiddleware, rbacMiddleware(['admin', 'operator']), getTraceLogsHandler)
+app.get('/api/v1/logs/node/:nodeId', authMiddleware, rbacMiddleware(['admin', 'operator']), getNodeLogsV2Handler)
+app.get('/api/v1/logs/service/:service', authMiddleware, rbacMiddleware(['admin', 'operator']), getServiceLogsHandler)
 
 // ==================== WebSocket ====================
 // WebSocket 暂时禁用 - Durable Object 有问题
