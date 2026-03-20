@@ -8,6 +8,8 @@ import 'package:anixops_mobile/core/services/playbooks_api.dart';
 import 'package:anixops_mobile/core/services/tasks_api.dart';
 import 'package:anixops_mobile/core/services/mfa_api.dart';
 import 'package:anixops_mobile/core/services/schedules_api.dart';
+import 'package:anixops_mobile/core/services/notifications_api.dart';
+import 'package:anixops_mobile/core/services/backup_api.dart';
 
 /// Central API client providing access to all API services
 class ApiClient {
@@ -23,6 +25,8 @@ class ApiClient {
   late final SchedulesApi schedules;
   late final TokensApi tokens;
   late final SessionsApi sessions;
+  late final NotificationsApi notifications;
+  late final BackupApi backup;
 
   // Cloud API endpoint
   static const String defaultBaseUrl = 'https://api.anixops.com/api/v1';
@@ -74,6 +78,8 @@ class ApiClient {
     schedules = SchedulesApi(_dio);
     tokens = TokensApi(_dio);
     sessions = SessionsApi(_dio);
+    notifications = NotificationsApi(_dio);
+    backup = BackupApi(_dio);
   }
 
   /// Update base URL
