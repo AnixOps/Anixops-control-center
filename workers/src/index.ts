@@ -92,6 +92,22 @@ import {
   toggleScalingPolicyHandler,
   getScalingMetricsHandler,
 } from './handlers/autoscaling'
+import {
+  listLoadBalancersHandler,
+  getLoadBalancerHandler,
+  createLoadBalancerHandler,
+  updateLoadBalancerHandler,
+  deleteLoadBalancerHandler,
+  selectTargetHandler,
+  checkTargetHealthHandler,
+  runHealthChecksHandler,
+  getLoadBalancerStatsHandler,
+  addTargetHandler,
+  removeTargetHandler,
+  updateTargetWeightHandler,
+  recordCompletionHandler,
+  toggleLoadBalancerHandler,
+} from './handlers/loadbalancer'
 
 // Middleware
 import { authMiddleware, rbacMiddleware } from './middleware/auth'
@@ -330,6 +346,22 @@ app.get('/api/v1/scaling/policies/:id/recommend', authMiddleware, rbacMiddleware
 app.get('/api/v1/scaling/policies/:id/metrics', authMiddleware, rbacMiddleware(['admin', 'operator']), getScalingMetricsHandler)
 app.get('/api/v1/scaling/health/:type/:id', authMiddleware, rbacMiddleware(['admin', 'operator']), checkHealthHandler)
 app.post('/api/v1/scaling/check', authMiddleware, rbacMiddleware(['admin']), runScalingCheckHandler)
+
+// ==================== Load Balancing ====================
+app.get('/api/v1/lb', authMiddleware, rbacMiddleware(['admin', 'operator']), listLoadBalancersHandler)
+app.post('/api/v1/lb', authMiddleware, rbacMiddleware(['admin']), createLoadBalancerHandler)
+app.get('/api/v1/lb/:id', authMiddleware, rbacMiddleware(['admin', 'operator']), getLoadBalancerHandler)
+app.put('/api/v1/lb/:id', authMiddleware, rbacMiddleware(['admin']), updateLoadBalancerHandler)
+app.delete('/api/v1/lb/:id', authMiddleware, rbacMiddleware(['admin']), deleteLoadBalancerHandler)
+app.post('/api/v1/lb/:id/toggle', authMiddleware, rbacMiddleware(['admin']), toggleLoadBalancerHandler)
+app.get('/api/v1/lb/:id/select', authMiddleware, selectTargetHandler)
+app.get('/api/v1/lb/:id/stats', authMiddleware, rbacMiddleware(['admin', 'operator']), getLoadBalancerStatsHandler)
+app.post('/api/v1/lb/:id/health-check', authMiddleware, rbacMiddleware(['admin', 'operator']), runHealthChecksHandler)
+app.get('/api/v1/lb/:id/targets/:targetId/health', authMiddleware, rbacMiddleware(['admin', 'operator']), checkTargetHealthHandler)
+app.post('/api/v1/lb/:id/targets', authMiddleware, rbacMiddleware(['admin']), addTargetHandler)
+app.delete('/api/v1/lb/:id/targets/:targetId', authMiddleware, rbacMiddleware(['admin']), removeTargetHandler)
+app.put('/api/v1/lb/:id/targets/:targetId/weight', authMiddleware, rbacMiddleware(['admin']), updateTargetWeightHandler)
+app.post('/api/v1/lb/:id/targets/:targetId/complete', authMiddleware, recordCompletionHandler)
 
 // ==================== WebSocket ====================
 // WebSocket 暂时禁用 - Durable Object 有问题
