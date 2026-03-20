@@ -14,6 +14,7 @@ import '../../features/logs/presentation/pages/logs_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/playbooks/presentation/pages/playbooks_page.dart';
+import '../../features/tasks/presentation/pages/tasks_page.dart';
 
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../shared/presentation/pages/main_shell.dart';
@@ -69,6 +70,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/playbooks',
             name: 'playbooks',
             builder: (context, state) => const PlaybooksPage(),
+          ),
+          GoRoute(
+            path: '/tasks',
+            name: 'tasks',
+            builder: (context, state) => const TasksPage(),
           ),
           GoRoute(
             path: '/plugins',
