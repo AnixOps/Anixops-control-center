@@ -7,10 +7,25 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.2`
+**Version**: `v2.0.0-rc.4`
 **Date**: 2026-03-20
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.2
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.4
+
+## Recent Changes (v2.0.0-rc.4)
+- Implement Playbooks feature for mobile app
+- Playbooks list with category filtering
+- Playbook detail page with YAML content viewer
+- Variable editor for playbook execution
+- Upload custom playbooks support
+- Sync built-in playbooks feature
+- 6 built-in playbooks: Fail2ban, Firewall, SSH Hardening, Docker, XRay, System Update
+
+## Recent Changes (v2.0.0-rc.3)
+- Fix Windows desktop window controls (minimize/maximize/close)
+- Fix language switching (now connected to localeProvider)
+- Fix theme switching (now connected to themeModeProvider)
+- Update VERSION to v2.0.0-rc.3
 
 ## Recent Changes (v2.0.0-rc.2)
 - Update permissions: all authenticated users can add nodes

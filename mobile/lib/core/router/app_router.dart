@@ -13,6 +13,7 @@ import '../../features/users/presentation/pages/users_page.dart';
 import '../../features/logs/presentation/pages/logs_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
+import '../../features/playbooks/presentation/pages/playbooks_page.dart';
 
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../shared/presentation/pages/main_shell.dart';
@@ -145,28 +146,4 @@ class ErrorPage extends StatelessWidget {
   }
 }
 
-/// Placeholder for PlaybooksPage
-class PlaybooksPage extends StatelessWidget {
-  const PlaybooksPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.play_circle_outline, size: 64),
-            const SizedBox(height: 16),
-            Text(
-              'Playbooks',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 8),
-            const Text('Ansible playbook management'),
-          ],
-        ),
-      ),
-    );
-  }
-}
+/// Placeholder for PlaybooksPage - now imported from features/playbooks

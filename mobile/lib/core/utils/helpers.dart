@@ -1,3 +1,6 @@
+import 'dart:math';
+import 'package:flutter/material.dart';
+
 /**
  * Utility functions for Dart/Flutter mobile app
  */
@@ -225,7 +228,3 @@ String formatUptime(Duration uptime) {
     return '${minutes}m';
   }
 }
-
-/// Required for isTablet function
-import 'dart:math';
-import 'package:flutter/material.dart';
