@@ -9,13 +9,13 @@ import (
 
 // Config represents the main configuration
 type Config struct {
-	Env      string          `yaml:"env"`
-	Server   ServerConfig    `yaml:"server"`
-	GRPC     GRPCConfig      `yaml:"grpc"`
-	Database DatabaseConfig  `yaml:"database"`
-	Auth     AuthConfig      `yaml:"auth"`
-	Plugins  PluginsConfig   `yaml:"plugins"`
-	Logging  LoggingConfig   `yaml:"logging"`
+	Env      string         `yaml:"env"`
+	Server   ServerConfig   `yaml:"server"`
+	GRPC     GRPCConfig     `yaml:"grpc"`
+	Database DatabaseConfig `yaml:"database"`
+	Auth     AuthConfig     `yaml:"auth"`
+	Plugins  PluginsConfig  `yaml:"plugins"`
+	Logging  LoggingConfig  `yaml:"logging"`
 }
 
 // ServerConfig holds HTTP server configuration
@@ -27,11 +27,11 @@ type ServerConfig struct {
 
 // GRPCConfig holds gRPC server configuration
 type GRPCConfig struct {
-	Enable          bool   `yaml:"enable"`
-	Host            string `yaml:"host"`
-	Port            int    `yaml:"port"`
-	KeepaliveTime   int    `yaml:"keepalive_time"`    // seconds
-	KeepaliveTimeout int   `yaml:"keepalive_timeout"` // seconds
+	Enable           bool   `yaml:"enable"`
+	Host             string `yaml:"host"`
+	Port             int    `yaml:"port"`
+	KeepaliveTime    int    `yaml:"keepalive_time"`    // seconds
+	KeepaliveTimeout int    `yaml:"keepalive_timeout"` // seconds
 }
 
 // DatabaseConfig holds database configuration
@@ -46,8 +46,8 @@ type DatabaseConfig struct {
 
 // AuthConfig holds authentication configuration
 type AuthConfig struct {
-	Provider string    `yaml:"provider"` // local, oauth, ldap, saml
-	JWT      JWTConfig `yaml:"jwt"`
+	Provider string           `yaml:"provider"` // local, oauth, ldap, saml
+	JWT      JWTConfig        `yaml:"jwt"`
 	Local    *LocalAuthConfig `yaml:"local,omitempty"`
 	OAuth    *OAuthConfig     `yaml:"oauth,omitempty"`
 	LDAP     *LDAPConfig      `yaml:"ldap,omitempty"`
@@ -56,10 +56,10 @@ type AuthConfig struct {
 
 // JWTConfig holds JWT configuration
 type JWTConfig struct {
-	Secret     string `yaml:"secret"`
-	Expire     int    `yaml:"expire"`      // seconds
-	RefreshExpire int `yaml:"refresh_expire"` // seconds
-	Issuer     string `yaml:"issuer"`
+	Secret        string `yaml:"secret"`
+	Expire        int    `yaml:"expire"`         // seconds
+	RefreshExpire int    `yaml:"refresh_expire"` // seconds
+	Issuer        string `yaml:"issuer"`
 }
 
 // LocalAuthConfig holds local authentication configuration
@@ -75,7 +75,7 @@ type OAuthConfig struct {
 
 // OAuthProvider holds a single OAuth provider configuration
 type OAuthProvider struct {
-	Name         string   `yaml:"name"`          // google, github, gitlab, custom
+	Name         string   `yaml:"name"` // google, github, gitlab, custom
 	ClientID     string   `yaml:"client_id"`
 	ClientSecret string   `yaml:"client_secret"`
 	RedirectURL  string   `yaml:"redirect_url"`
@@ -87,13 +87,13 @@ type OAuthProvider struct {
 
 // LDAPConfig holds LDAP configuration
 type LDAPConfig struct {
-	URL          string `yaml:"url"`            // ldap://server:389
-	BindDN       string `yaml:"bind_dn"`        // cn=admin,dc=example,dc=com
+	URL          string `yaml:"url"`     // ldap://server:389
+	BindDN       string `yaml:"bind_dn"` // cn=admin,dc=example,dc=com
 	BindPassword string `yaml:"bind_password"`
-	BaseDN       string `yaml:"base_dn"`        // ou=users,dc=example,dc=com
-	Filter       string `yaml:"filter"`         // (uid=%s)
+	BaseDN       string `yaml:"base_dn"` // ou=users,dc=example,dc=com
+	Filter       string `yaml:"filter"`  // (uid=%s)
 	TLS          bool   `yaml:"tls"`
-	Insecure     bool   `yaml:"insecure"`       // skip certificate verification
+	Insecure     bool   `yaml:"insecure"` // skip certificate verification
 }
 
 // SAMLConfig holds SAML configuration
@@ -107,17 +107,17 @@ type SAMLConfig struct {
 
 // PluginsConfig holds plugin configurations
 type PluginsConfig struct {
-	Ansible  map[string]interface{} `yaml:"ansible"`
-	V2board  map[string]interface{} `yaml:"v2board"`
-	V2bX     map[string]interface{} `yaml:"v2bx"`
-	Agent    map[string]interface{} `yaml:"agent"`
+	Ansible map[string]interface{} `yaml:"ansible"`
+	V2board map[string]interface{} `yaml:"v2board"`
+	V2bX    map[string]interface{} `yaml:"v2bx"`
+	Agent   map[string]interface{} `yaml:"agent"`
 }
 
 // LoggingConfig holds logging configuration
 type LoggingConfig struct {
-	Level  string `yaml:"level"`   // debug, info, warn, error
-	Format string `yaml:"format"`  // json, text
-	Output string `yaml:"output"`  // stdout, stderr, file path
+	Level  string `yaml:"level"`  // debug, info, warn, error
+	Format string `yaml:"format"` // json, text
+	Output string `yaml:"output"` // stdout, stderr, file path
 }
 
 // Load loads configuration from a file

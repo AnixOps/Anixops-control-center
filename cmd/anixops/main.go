@@ -11,10 +11,10 @@ import (
 
 	"github.com/anixops/anixops-control-center/internal/core/config"
 	"github.com/anixops/anixops-control-center/internal/core/plugin"
+	"github.com/anixops/anixops-control-center/internal/plugins/agent"
 	"github.com/anixops/anixops-control-center/internal/plugins/ansible"
 	"github.com/anixops/anixops-control-center/internal/plugins/v2board"
 	"github.com/anixops/anixops-control-center/internal/plugins/v2bx"
-	"github.com/anixops/anixops-control-center/internal/plugins/agent"
 	"github.com/anixops/anixops-control-center/internal/security/auth"
 )
 

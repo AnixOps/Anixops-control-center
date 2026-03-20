@@ -44,7 +44,7 @@ Thumbs.db
 
 # Logs
 *.log
-logs/
+/logs/
 
 # Node.js
 node_modules/
@@ -59,3 +59,7 @@ web/dist/
 configs/config.prod.yaml
 *.pem
 *.key
+
+# Wrangler
+.wrangler/
+.dev.vars

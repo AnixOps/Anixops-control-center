@@ -1,0 +1,87 @@
+import 'package:dio/dio.dart';
+import 'package:anixops_mobile/core/services/auth_api.dart';
+import 'package:anixops_mobile/core/services/nodes_api.dart';
+import 'package:anixops_mobile/core/services/users_api.dart';
+import 'package:anixops_mobile/core/services/plugins_api.dart';
+import 'package:anixops_mobile/core/services/ssh_api.dart';
+
+/// Central API client providing access to all API services
+class ApiClient {
+  late final Dio _dio;
+  late final AuthApi auth;
+  late final NodesApi nodes;
+  late final UsersApi users;
+  late final PluginsApi plugins;
+  late final SshApi ssh;
+  late final TokensApi tokens;
+  late final SessionsApi sessions;
+
+  // Cloud API endpoint
+  static const String defaultBaseUrl = 'https://api.anixops.com/api/v1';
+
+  ApiClient({
+    String baseUrl = defaultBaseUrl,
+    Duration connectTimeout = const Duration(seconds: 30),
+    Duration receiveTimeout = const Duration(seconds: 30),
+  }) {
+    _dio = Dio(BaseOptions(
+      baseUrl: baseUrl,
+      connectTimeout: connectTimeout,
+      receiveTimeout: receiveTimeout,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    ));
+
+    // Add interceptors
+    _dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) {
+        // Add auth token if available
+        // final token = _getToken();
+        // if (token != null) {
+        //   options.headers['Authorization'] = 'Bearer $token';
+        // }
+        return handler.next(options);
+      },
+      onResponse: (response, handler) {
+        return handler.next(response);
+      },
+      onError: (error, handler) {
+        if (error.response?.statusCode == 401) {
+          // Handle unauthorized
+        }
+        return handler.next(error);
+      },
+    ));
+
+    // Initialize API services
+    auth = AuthApi(_dio);
+    nodes = NodesApi(_dio);
+    users = UsersApi(_dio);
+    plugins = PluginsApi(_dio);
+    ssh = SshApi(_dio);
+    tokens = TokensApi(_dio);
+    sessions = SessionsApi(_dio);
+  }
+
+  /// Update base URL
+  void setBaseUrl(String url) {
+    _dio.options.baseUrl = url;
+  }
+
+  /// Set authentication token
+  void setAuthToken(String token) {
+    _dio.options.headers['Authorization'] = 'Bearer $token';
+  }
+
+  /// Clear authentication token
+  void clearAuthToken() {
+    _dio.options.headers.remove('Authorization');
+  }
+
+  /// Get raw Dio instance for custom requests
+  Dio get dio => _dio;
+}
+
+/// Provider for global API client
+final ApiClient apiClient = ApiClient();

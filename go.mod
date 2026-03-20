@@ -1,6 +1,6 @@
 module github.com/anixops/anixops-control-center
 
-go 1.25
+go 1.24
 
 require (
 	github.com/charmbracelet/bubbles v0.17.0

@@ -8,7 +8,7 @@ import (
 // Event represents an event in the system
 type Event struct {
 	Type      string      `json:"type"`
-	Source    string      `json:"source"`    // plugin name or "system"
+	Source    string      `json:"source"` // plugin name or "system"
 	Timestamp int64       `json:"timestamp"`
 	Data      interface{} `json:"data,omitempty"`
 }
@@ -18,7 +18,7 @@ type Handler func(ctx context.Context, event Event) error
 
 // EventBus provides pub/sub functionality
 type EventBus struct {
-	mu      sync.RWMutex
+	mu       sync.RWMutex
 	handlers map[string][]Handler
 	buffer   int
 }

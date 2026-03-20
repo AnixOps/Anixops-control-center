@@ -13,8 +13,8 @@ import (
 
 // Config holds V2bX plugin configuration
 type Config struct {
-	Hosts    []NodeConfig `yaml:"hosts"`    // Multiple V2bX nodes
-	Timeout  int          `yaml:"timeout"`  // request timeout in seconds
+	Hosts   []NodeConfig `yaml:"hosts"`   // Multiple V2bX nodes
+	Timeout int          `yaml:"timeout"` // request timeout in seconds
 }
 
 // NodeConfig holds configuration for a single V2bX node
@@ -29,10 +29,10 @@ type NodeConfig struct {
 
 // V2bXPlugin implements the plugin interface for V2bX
 type V2bXPlugin struct {
-	config   Config
-	clients  map[int]*resty.Client
-	status   plugin.Status
-	mu       sync.RWMutex
+	config  Config
+	clients map[int]*resty.Client
+	status  plugin.Status
+	mu      sync.RWMutex
 }
 
 // New creates a new V2bX plugin
@@ -80,7 +80,7 @@ func (p *V2bXPlugin) Init(ctx context.Context, config map[string]interface{}) er
 	for _, node := range p.config.Hosts {
 		client := resty.New().
 			SetBaseURL(fmt.Sprintf("http://%s:%d", node.Host, node.Port)).
-			SetTimeout(time.Duration(p.config.Timeout) * time.Second).
+			SetTimeout(time.Duration(p.config.Timeout)*time.Second).
 			SetHeader("Content-Type", "application/json")
 
 		if node.APIKey != "" {

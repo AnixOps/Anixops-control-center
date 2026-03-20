@@ -13,18 +13,18 @@ import (
 
 // Config holds agent plugin configuration
 type Config struct {
-	Host     string `yaml:"host"`     // WebSocket host
-	Port     int    `yaml:"port"`     // WebSocket port
+	Host     string `yaml:"host"` // WebSocket host
+	Port     int    `yaml:"port"` // WebSocket port
 	APIToken string `yaml:"api_token"`
 	Timeout  int    `yaml:"timeout"`
 }
 
 // AgentPlugin implements the plugin interface for AnixOps-agent
 type AgentPlugin struct {
-	config   Config
-	conn     *websocket.Conn
-	status   plugin.Status
-	mu       sync.RWMutex
+	config Config
+	conn   *websocket.Conn
+	status plugin.Status
+	mu     sync.RWMutex
 }
 
 // New creates a new agent plugin

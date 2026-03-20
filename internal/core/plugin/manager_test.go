@@ -10,11 +10,11 @@ import (
 
 // MockPlugin is a mock implementation of Plugin for testing
 type MockPlugin struct {
-	info       plugin.PluginInfo
-	initErr    error
-	startErr   error
-	stopErr    error
-	healthErr  error
+	info      plugin.PluginInfo
+	initErr   error
+	startErr  error
+	stopErr   error
+	healthErr error
 }
 
 func (m *MockPlugin) Info() plugin.PluginInfo {

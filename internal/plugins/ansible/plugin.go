@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/anixops/anixops-control-center/internal/core/plugin"
 	"github.com/anixops/anixops-control-center/internal/core/eventbus"
+	"github.com/anixops/anixops-control-center/internal/core/plugin"
 )
 
 // Config holds ansible plugin configuration
@@ -27,11 +27,11 @@ type Config struct {
 
 // AnsiblePlugin implements the plugin interface for Ansible
 type AnsiblePlugin struct {
-	config    Config
-	executor  *Executor
-	eventBus  *eventbus.EventBus
-	status    plugin.Status
-	mu        sync.RWMutex
+	config   Config
+	executor *Executor
+	eventBus *eventbus.EventBus
+	status   plugin.Status
+	mu       sync.RWMutex
 }
 
 // New creates a new Ansible plugin

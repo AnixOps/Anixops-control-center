@@ -7,7 +7,7 @@ import (
 
 // Registry provides a global plugin registry
 type Registry struct {
-	mu      sync.RWMutex
+	mu        sync.RWMutex
 	factories map[string]Factory
 }
 

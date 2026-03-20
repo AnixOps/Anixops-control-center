@@ -32,12 +32,12 @@ type Message struct {
 
 // Client represents a WebSocket client
 type Client struct {
-	hub      *Hub
-	conn     *websocket.Conn
-	send     chan []byte
-	topics   map[string]bool
-	userID   string
-	role     string
+	hub    *Hub
+	conn   *websocket.Conn
+	send   chan []byte
+	topics map[string]bool
+	userID string
+	role   string
 }
 
 // Hub maintains the set of active clients and broadcasts messages
