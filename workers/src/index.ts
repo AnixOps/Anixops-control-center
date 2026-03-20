@@ -41,6 +41,19 @@ import {
 import { batchOperationsHandler, bulkNodeStatusHandler } from './handlers/batch'
 import { prometheusMetricsHandler, detailedHealthHandler, readinessHandler as k8sReadinessHandler, livenessHandler } from './handlers/metrics'
 import { cacheMiddleware } from './middleware/cache'
+import {
+  listNamespacesHandler,
+  listPodsHandler,
+  listDeploymentsHandler,
+  listClusterNodesHandler,
+  listServicesHandler,
+  listEventsHandler,
+  getPodLogsHandler,
+  scaleDeploymentHandler,
+  restartDeploymentHandler,
+  getClusterOverviewHandler,
+  getNamespaceDetailsHandler,
+} from './handlers/kubernetes'
 
 // Middleware
 import { authMiddleware, rbacMiddleware } from './middleware/auth'
@@ -228,6 +241,19 @@ app.post('/api/v1/admin/users/:id/mfa/disable', authMiddleware, rbacMiddleware([
 
 // ==================== 批量操作 ====================
 app.post('/api/v1/batch', authMiddleware, rbacMiddleware(['admin', 'operator']), batchOperationsHandler)
+
+// ==================== Kubernetes 集成 ====================
+app.get('/api/v1/kubernetes/overview', authMiddleware, rbacMiddleware(['admin', 'operator']), getClusterOverviewHandler)
+app.get('/api/v1/kubernetes/namespaces', authMiddleware, rbacMiddleware(['admin', 'operator']), listNamespacesHandler)
+app.get('/api/v1/kubernetes/namespaces/:namespace', authMiddleware, rbacMiddleware(['admin', 'operator']), getNamespaceDetailsHandler)
+app.get('/api/v1/kubernetes/nodes', authMiddleware, rbacMiddleware(['admin', 'operator']), listClusterNodesHandler)
+app.get('/api/v1/kubernetes/pods', authMiddleware, rbacMiddleware(['admin', 'operator']), listPodsHandler)
+app.get('/api/v1/kubernetes/deployments', authMiddleware, rbacMiddleware(['admin', 'operator']), listDeploymentsHandler)
+app.get('/api/v1/kubernetes/services', authMiddleware, rbacMiddleware(['admin', 'operator']), listServicesHandler)
+app.get('/api/v1/kubernetes/events', authMiddleware, rbacMiddleware(['admin', 'operator']), listEventsHandler)
+app.get('/api/v1/kubernetes/namespaces/:namespace/pods/:pod/logs', authMiddleware, rbacMiddleware(['admin', 'operator']), getPodLogsHandler)
+app.post('/api/v1/kubernetes/namespaces/:namespace/deployments/:name/scale', authMiddleware, rbacMiddleware(['admin']), scaleDeploymentHandler)
+app.post('/api/v1/kubernetes/namespaces/:namespace/deployments/:name/restart', authMiddleware, rbacMiddleware(['admin', 'operator']), restartDeploymentHandler)
 
 // ==================== WebSocket ====================
 // WebSocket 暂时禁用 - Durable Object 有问题
