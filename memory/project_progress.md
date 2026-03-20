@@ -7,10 +7,16 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.5`
+**Version**: `v2.0.0-rc.6`
 **Date**: 2026-03-20
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.5
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.6
+
+## Recent Changes (v2.0.0-rc.6)
+- Implement MFA (Two-Factor Authentication) settings for mobile app
+- MFA setup dialog with QR code and recovery codes
+- Enable/disable MFA with verification
+- Update Android compileSdk to 36 for latest dependencies
 
 ## Recent Changes (v2.0.0-rc.5)
 - Implement Tasks management feature for mobile app
