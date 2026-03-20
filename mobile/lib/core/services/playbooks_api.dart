@@ -97,7 +97,7 @@ class PlaybooksApi {
 
   /// Get built-in playbooks
   Future<List<Playbook>> getBuiltInPlaybooks() async {
-    final response = await _dio.get('/playbooks/builtin');
+    final response = await _dio.get('/playbooks/built-in');
     final data = response.data['data'] as List<dynamic>;
     return data.map((json) => Playbook.fromJson(json as Map<String, dynamic>)).toList();
   }
@@ -142,7 +142,7 @@ class PlaybooksApi {
 
   /// Sync built-in playbooks
   Future<List<String>> syncBuiltIn() async {
-    final response = await _dio.post('/playbooks/sync');
+    final response = await _dio.post('/playbooks/sync-builtin');
     return (response.data['data'] as List<dynamic>).cast<String>();
   }
 }

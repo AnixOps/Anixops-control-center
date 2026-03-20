@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'package:anixops_mobile/core/services/api_client.dart';
+import 'package:anixops_mobile/core/providers/api_providers.dart';
 
 class AuthState {
   final bool isAuthenticated;
@@ -211,11 +212,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
 // Provider for SharedPreferences
 final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
   throw UnimplementedError('SharedPreferences must be overridden');
-});
-
-// Provider for ApiClient
-final apiClientProvider = Provider<ApiClient>((ref) {
-  return ApiClient();
 });
 
 // Auth state provider
