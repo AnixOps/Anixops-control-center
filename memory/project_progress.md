@@ -7,10 +7,18 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.8`
+**Version**: `v2.0.0-rc.9`
 **Date**: 2026-03-20
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.8
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.9
+
+## Recent Changes (v2.0.0-rc.9)
+- Add Tasks and Schedules pages to Web Frontend
+- Implement full logs page with filtering and streaming
+- Add NotificationsApi and BackupApi services
+- Fix Schedule enabled parsing for bool/int types
+- Add schedules provider tests
+- Flutter: 81 tests, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.8)
 - Implement full logs page with filtering and streaming
