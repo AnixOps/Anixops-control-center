@@ -7,10 +7,18 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.6`
+**Version**: `v2.0.0-rc.7`
 **Date**: 2026-03-20
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.6
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.7
+
+## Recent Changes (v2.0.0-rc.7)
+- Fix logs_provider_test.dart to match actual LogsState API
+- Fix dashboard_page_test.dart async timer issues
+- Add logs_provider.dart for log management
+- Fix schedules_provider.dart import paths and add enabled parameter
+- Simplify widget_test.dart to basic smoke test
+- Flutter: 74 tests, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.6)
 - Implement MFA (Two-Factor Authentication) settings for mobile app
