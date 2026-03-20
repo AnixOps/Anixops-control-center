@@ -6,10 +6,44 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import {
   DEFAULT_QUOTAS,
   type TenantQuotas,
+  createTenant,
+  getTenant,
+  getTenantBySlug,
+  updateTenant,
+  deleteTenant,
+  addTenantMember,
+  removeTenantMember,
+  getTenantMembers,
+  getUserTenantMembership,
+  getUserTenants,
+  getRoleByName,
+  getRoleById,
+  createRole,
+  updateRole,
+  deleteRole,
+  hasPermission,
+  hasAnyPermission,
+  getTenantQuotas,
+  getTenantUsage,
+  checkQuota,
+  createInvitation,
+  getInvitationByToken,
+  acceptInvitation,
+  deleteInvitation,
+  getTenantInvitations,
+  getAllPermissions,
 } from './tenant'
+import { createMockKV, createMockD1 } from '../../test/setup'
 
-// Import functions that can be tested without database
 describe('Tenant Service', () => {
+  let mockEnv: any
+
+  beforeEach(() => {
+    mockEnv = {
+      DB: createMockD1(),
+      KV: createMockKV(),
+    }
+  })
   describe('DEFAULT_QUOTAS', () => {
     it('should have free plan quotas', () => {
       expect(DEFAULT_QUOTAS.free).toBeDefined()
@@ -304,6 +338,317 @@ describe('Tenant Service', () => {
       ]
 
       expect(playbooksPermissions.length).toBe(4)
+    })
+  })
+
+  describe('createTenant', () => {
+    it('should create a tenant successfully', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Test Tenant',
+        slug: 'test-tenant',
+        plan: 'pro',
+      })
+
+      expect(tenant).toBeDefined()
+      expect(tenant.name).toBe('Test Tenant')
+      expect(tenant.slug).toBe('test-tenant')
+      expect(tenant.plan).toBe('pro')
+    })
+
+    it('should create tenant with free plan by default', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Free Tenant',
+        slug: 'free-tenant',
+      })
+
+      expect(tenant.plan).toBe('free')
+    })
+  })
+
+  describe('getTenant', () => {
+    it('should return null for non-existent tenant', async () => {
+      const tenant = await getTenant(mockEnv, 999)
+      expect(tenant).toBeNull()
+    })
+  })
+
+  describe('getTenantBySlug', () => {
+    it('should return null for non-existent slug', async () => {
+      const tenant = await getTenantBySlug(mockEnv, 'non-existent')
+      expect(tenant).toBeNull()
+    })
+  })
+
+  describe('updateTenant', () => {
+    it('should update tenant properties', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Original Name',
+        slug: 'original',
+      })
+
+      const updated = await updateTenant(mockEnv, tenant.id, {
+        name: 'Updated Name',
+        plan: 'pro',
+      })
+
+      expect(updated).toBeDefined()
+    })
+  })
+
+  describe('deleteTenant', () => {
+    it('should soft delete tenant', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'To Delete',
+        slug: 'to-delete',
+      })
+
+      const result = await deleteTenant(mockEnv, tenant.id)
+      expect(result).toBe(true)
+    })
+  })
+
+  describe('Tenant Member Operations', () => {
+    it('should add tenant member', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Member Test',
+        slug: 'member-test',
+      })
+
+      const member = await addTenantMember(mockEnv, tenant.id, 1, undefined, 1)
+      expect(member).toBeDefined()
+      expect(member.tenant_id).toBe(tenant.id)
+      expect(member.user_id).toBe(1)
+    })
+
+    it('should remove tenant member', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Remove Member',
+        slug: 'remove-member',
+      })
+
+      await addTenantMember(mockEnv, tenant.id, 1)
+      const result = await removeTenantMember(mockEnv, tenant.id, 1)
+      expect(result).toBe(true)
+    })
+
+    it('should get tenant members', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Get Members',
+        slug: 'get-members',
+      })
+
+      await addTenantMember(mockEnv, tenant.id, 1)
+      const members = await getTenantMembers(mockEnv, tenant.id)
+      expect(Array.isArray(members)).toBe(true)
+    })
+
+    it('should get user tenant membership', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Membership Check',
+        slug: 'membership-check',
+      })
+
+      await addTenantMember(mockEnv, tenant.id, 1)
+      const membership = await getUserTenantMembership(mockEnv, 1, tenant.id)
+      expect(membership).toBeDefined()
+    })
+
+    it('should get user tenants', async () => {
+      const tenants = await getUserTenants(mockEnv, 1)
+      expect(Array.isArray(tenants)).toBe(true)
+    })
+  })
+
+  describe('Role Operations', () => {
+    it('should get role by name', async () => {
+      const role = await getRoleByName(mockEnv, 'admin')
+      expect(role).toBeNull() // No roles exist initially
+    })
+
+    it('should get role by ID', async () => {
+      const role = await getRoleById(mockEnv, 999)
+      expect(role).toBeNull()
+    })
+
+    it('should create role', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Role Test',
+        slug: 'role-test',
+      })
+
+      const role = await createRole(mockEnv, tenant.id, {
+        name: 'custom_role',
+        display_name: 'Custom Role',
+        description: 'A custom role',
+        permissions: ['nodes:read', 'playbooks:read'],
+      })
+
+      expect(role).toBeDefined()
+      expect(role.name).toBe('custom_role')
+    })
+  })
+
+  describe('Permission Checks', () => {
+    it('should check hasPermission', async () => {
+      const result = await hasPermission(mockEnv, 1, 1, 'nodes:read')
+      expect(result).toBe(false)
+    })
+
+    it('should check hasAnyPermission', async () => {
+      const result = await hasAnyPermission(mockEnv, 1, 1, ['nodes:read', 'playbooks:read'])
+      expect(result).toBe(false)
+    })
+  })
+
+  describe('Quota Operations', () => {
+    it('should get tenant quotas', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Quota Test',
+        slug: 'quota-test',
+        plan: 'pro',
+      })
+
+      const quotas = await getTenantQuotas(mockEnv, tenant.id)
+      expect(quotas).toBeDefined()
+    })
+
+    it('should return null quotas for non-existent tenant', async () => {
+      const quotas = await getTenantQuotas(mockEnv, 999)
+      expect(quotas).toBeNull()
+    })
+
+    it('should get tenant usage', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Usage Test',
+        slug: 'usage-test',
+      })
+
+      const usage = await getTenantUsage(mockEnv, tenant.id)
+      expect(usage).toBeDefined()
+      expect(typeof usage.nodes_count).toBe('number')
+      expect(typeof usage.users_count).toBe('number')
+    })
+
+    it('should check quota', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Check Quota',
+        slug: 'check-quota',
+        plan: 'free',
+      })
+
+      const result = await checkQuota(mockEnv, tenant.id, 'max_nodes', 1)
+      expect(result).toHaveProperty('allowed')
+      expect(result).toHaveProperty('current')
+      expect(result).toHaveProperty('limit')
+    })
+  })
+
+  describe('Invitation Operations', () => {
+    it('should create invitation', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Invite Test',
+        slug: 'invite-test',
+      })
+
+      const invitation = await createInvitation(
+        mockEnv,
+        tenant.id,
+        'test@example.com',
+        undefined,
+        1,
+        72
+      )
+
+      expect(invitation).toBeDefined()
+      expect(invitation.email).toBe('test@example.com')
+      expect(invitation.token).toBeDefined()
+    })
+
+    it('should get invitation by token', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Token Test',
+        slug: 'token-test',
+      })
+
+      const invitation = await createInvitation(
+        mockEnv,
+        tenant.id,
+        'token@example.com',
+        undefined,
+        1
+      )
+
+      const found = await getInvitationByToken(mockEnv, invitation.token)
+      expect(found).toBeDefined()
+      expect(found!.token).toBe(invitation.token)
+    })
+
+    it('should return null for non-existent token', async () => {
+      const found = await getInvitationByToken(mockEnv, 'non-existent-token')
+      expect(found).toBeNull()
+    })
+
+    it('should accept invitation', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Accept Test',
+        slug: 'accept-test',
+      })
+
+      const invitation = await createInvitation(
+        mockEnv,
+        tenant.id,
+        'accept@example.com',
+        undefined,
+        1
+      )
+
+      const result = await acceptInvitation(mockEnv, invitation.token, 2)
+      expect(result.success).toBe(true)
+      expect(result.tenantId).toBe(tenant.id)
+    })
+
+    it('should fail for non-existent invitation', async () => {
+      const result = await acceptInvitation(mockEnv, 'non-existent', 1)
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Invitation not found')
+    })
+
+    it('should delete invitation', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'Delete Invite',
+        slug: 'delete-invite',
+      })
+
+      const invitation = await createInvitation(
+        mockEnv,
+        tenant.id,
+        'delete@example.com',
+        undefined,
+        1
+      )
+
+      const result = await deleteInvitation(mockEnv, invitation.id)
+      expect(result).toBe(true)
+    })
+
+    it('should get tenant invitations', async () => {
+      const tenant = await createTenant(mockEnv, {
+        name: 'List Invites',
+        slug: 'list-invites',
+      })
+
+      await createInvitation(mockEnv, tenant.id, 'list1@example.com', undefined, 1)
+      await createInvitation(mockEnv, tenant.id, 'list2@example.com', undefined, 1)
+
+      const invitations = await getTenantInvitations(mockEnv, tenant.id)
+      expect(Array.isArray(invitations)).toBe(true)
+    })
+  })
+
+  describe('getAllPermissions', () => {
+    it('should return all permissions', async () => {
+      const permissions = await getAllPermissions(mockEnv)
+      expect(Array.isArray(permissions)).toBe(true)
     })
   })
 })

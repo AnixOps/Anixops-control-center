@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import type { Env } from '../types'
+import { logAudit } from '../utils/audit'
 
 interface Plugin {
   name: string
@@ -82,31 +83,4 @@ export async function executePluginHandler(c: Context<{ Bindings: Env }>) {
       timestamp: new Date().toISOString(),
     },
   })
-}
-
-async function logAudit(
-  c: Context<{ Bindings: Env }>,
-  userId: number,
-  action: string,
-  resource: string,
-  details?: Record<string, unknown>
-) {
-  try {
-    await c.env.DB
-      .prepare(`
-        INSERT INTO audit_logs (user_id, action, resource, ip, user_agent, details)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `)
-      .bind(
-        userId,
-        action,
-        resource,
-        c.req.header('CF-Connecting-IP') || null,
-        c.req.header('User-Agent') || null,
-        details ? JSON.stringify(details) : null
-      )
-      .run()
-  } catch (err) {
-    console.error('Failed to log audit:', err)
-  }
 }

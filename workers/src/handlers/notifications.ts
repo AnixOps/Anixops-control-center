@@ -1,13 +1,16 @@
 import type { Context } from 'hono'
 import { z } from 'zod'
 import type { Env } from '../types'
+import { logAudit } from '../utils/audit'
 
 const createNotificationSchema = z.object({
   title: z.string().min(1).max(200),
   message: z.string().min(1),
-  type: z.enum(['info', 'warning', 'error', 'success']).default('info'),
-  user_id: z.number().int().optional(), // 如果指定则发送给特定用户，否则广播
-  data: z.record(z.unknown()).optional(),
+  type: z.enum(['info', 'warning', 'error', 'success', 'task', 'system']).default('info'),
+  user_id: z.number().int().optional(),
+  resource_type: z.string().optional(),
+  resource_id: z.string().optional(),
+  action_url: z.string().optional(),
 })
 
 /**
@@ -18,44 +21,50 @@ export async function listNotificationsHandler(c: Context<{ Bindings: Env }>) {
   const page = parseInt(c.req.query('page') || '1', 10)
   const perPage = parseInt(c.req.query('per_page') || '20', 10)
   const unreadOnly = c.req.query('unread_only') === 'true'
+  const type = c.req.query('type')
 
-  // 从KV获取用户通知
-  const notificationsKey = `notifications:${user.sub}`
-  let notifications = await c.env.KV.get(notificationsKey, 'json') as Array<{
-    id: string
-    title: string
-    message: string
-    type: string
-    read: boolean
-    created_at: string
-    data?: Record<string, unknown>
-  }> | null
+  let sql = 'SELECT * FROM notifications WHERE user_id = ?'
+  const params: (string | number)[] = [user.sub]
 
-  if (!notifications) {
-    // 生成一些模拟通知
-    notifications = generateMockNotifications()
-    await c.env.KV.put(notificationsKey, JSON.stringify(notifications), { expirationTtl: 86400 * 7 })
-  }
-
-  // 过滤未读
   if (unreadOnly) {
-    notifications = notifications.filter(n => !n.read)
+    sql += ' AND read = 0'
   }
 
-  // 分页
-  const total = notifications.length
-  const startIndex = (page - 1) * perPage
-  const paginatedNotifications = notifications.slice(startIndex, startIndex + perPage)
+  if (type) {
+    sql += ' AND type = ?'
+    params.push(type)
+  }
+
+  // Count
+  const countResult = await c.env.DB
+    .prepare(`SELECT COUNT(*) as total FROM (${sql})`)
+    .bind(...params)
+    .first<{ total: number }>()
+
+  // Paginated results
+  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?'
+  params.push(perPage, (page - 1) * perPage)
+
+  const result = await c.env.DB
+    .prepare(sql)
+    .bind(...params)
+    .all()
+
+  // Get unread count
+  const unreadResult = await c.env.DB
+    .prepare('SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0')
+    .bind(user.sub)
+    .first<{ count: number }>()
 
   return c.json({
     success: true,
     data: {
-      items: paginatedNotifications,
-      total,
+      items: result.results,
+      total: countResult?.total || 0,
       page,
       per_page: perPage,
-      total_pages: Math.ceil(total / perPage),
-      unread_count: notifications.filter(n => !n.read).length,
+      total_pages: Math.ceil((countResult?.total || 0) / perPage),
+      unread_count: unreadResult?.count || 0,
     },
   })
 }
@@ -67,22 +76,13 @@ export async function markNotificationReadHandler(c: Context<{ Bindings: Env }>)
   const user = c.get('user')
   const notificationId = c.req.param('id')
 
-  const notificationsKey = `notifications:${user.sub}`
-  const notifications = await c.env.KV.get(notificationsKey, 'json') as Array<{
-    id: string
-    title: string
-    message: string
-    type: string
-    read: boolean
-    created_at: string
-  }> | null
+  const result = await c.env.DB
+    .prepare('UPDATE notifications SET read = 1 WHERE id = ? AND user_id = ?')
+    .bind(notificationId, user.sub)
+    .run()
 
-  if (notifications) {
-    const index = notifications.findIndex(n => n.id === notificationId)
-    if (index !== -1) {
-      notifications[index].read = true
-      await c.env.KV.put(notificationsKey, JSON.stringify(notifications), { expirationTtl: 86400 * 7 })
-    }
+  if (result.meta.changes === 0) {
+    return c.json({ success: false, error: 'Notification not found' }, 404)
   }
 
   return c.json({
@@ -97,18 +97,10 @@ export async function markNotificationReadHandler(c: Context<{ Bindings: Env }>)
 export async function markAllNotificationsReadHandler(c: Context<{ Bindings: Env }>) {
   const user = c.get('user')
 
-  const notificationsKey = `notifications:${user.sub}`
-  const notifications = await c.env.KV.get(notificationsKey, 'json') as Array<{
-    id: string
-    read: boolean
-  }> | null
-
-  if (notifications) {
-    for (const notification of notifications) {
-      notification.read = true
-    }
-    await c.env.KV.put(notificationsKey, JSON.stringify(notifications), { expirationTtl: 86400 * 7 })
-  }
+  await c.env.DB
+    .prepare('UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0')
+    .bind(user.sub)
+    .run()
 
   return c.json({
     success: true,
@@ -123,14 +115,13 @@ export async function deleteNotificationHandler(c: Context<{ Bindings: Env }>) {
   const user = c.get('user')
   const notificationId = c.req.param('id')
 
-  const notificationsKey = `notifications:${user.sub}`
-  const notifications = await c.env.KV.get(notificationsKey, 'json') as Array<{
-    id: string
-  }> | null
+  const result = await c.env.DB
+    .prepare('DELETE FROM notifications WHERE id = ? AND user_id = ?')
+    .bind(notificationId, user.sub)
+    .run()
 
-  if (notifications) {
-    const filtered = notifications.filter(n => n.id !== notificationId)
-    await c.env.KV.put(notificationsKey, JSON.stringify(filtered), { expirationTtl: 86400 * 7 })
+  if (result.meta.changes === 0) {
+    return c.json({ success: false, error: 'Notification not found' }, 404)
   }
 
   return c.json({
@@ -140,42 +131,39 @@ export async function deleteNotificationHandler(c: Context<{ Bindings: Env }>) {
 }
 
 /**
- * 创建通知（内部API）
+ * 创建通知
  */
 export async function createNotificationHandler(c: Context<{ Bindings: Env }>) {
-  const user = c.get('user')
+  const currentUser = c.get('user')
 
   try {
     const body = await c.req.json()
     const data = createNotificationSchema.parse(body)
 
-    const notification = {
-      id: crypto.randomUUID(),
-      title: data.title,
-      message: data.message,
-      type: data.type,
-      read: false,
-      created_at: new Date().toISOString(),
-      data: data.data,
-    }
+    const targetUserId = data.user_id || currentUser.sub
 
-    if (data.user_id) {
-      // 发送给特定用户
-      const notificationsKey = `notifications:${data.user_id}`
-      const notifications = await c.env.KV.get(notificationsKey, 'json') as Array<typeof notification> | null
-      await c.env.KV.put(notificationsKey, JSON.stringify([notification, ...(notifications || [])]), { expirationTtl: 86400 * 7 })
-    } else {
-      // 广播给所有用户 - 这里简化处理，只记录到系统通知
-      const broadcastKey = 'notifications:broadcast'
-      const broadcasts = await c.env.KV.get(broadcastKey, 'json') as Array<typeof notification> | null
-      await c.env.KV.put(broadcastKey, JSON.stringify([notification, ...(broadcasts || [])]), { expirationTtl: 86400 * 7 })
-    }
+    const result = await c.env.DB
+      .prepare(`
+        INSERT INTO notifications (user_id, type, title, message, resource_type, resource_id, action_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        RETURNING *
+      `)
+      .bind(
+        targetUserId,
+        data.type,
+        data.title,
+        data.message,
+        data.resource_type || null,
+        data.resource_id || null,
+        data.action_url || null
+      )
+      .first()
 
-    await logAudit(c, user.sub, 'create_notification', 'notification', { title: data.title })
+    await logAudit(c, currentUser.sub, 'create_notification', 'notification', { title: data.title })
 
     return c.json({
       success: true,
-      data: notification,
+      data: result,
     }, 201)
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -191,75 +179,49 @@ export async function createNotificationHandler(c: Context<{ Bindings: Env }>) {
 export async function getUnreadCountHandler(c: Context<{ Bindings: Env }>) {
   const user = c.get('user')
 
-  const notificationsKey = `notifications:${user.sub}`
-  const notifications = await c.env.KV.get(notificationsKey, 'json') as Array<{
-    read: boolean
-  }> | null
-
-  const unreadCount = notifications ? notifications.filter(n => !n.read).length : 0
+  const result = await c.env.DB
+    .prepare('SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read = 0')
+    .bind(user.sub)
+    .first<{ count: number }>()
 
   return c.json({
     success: true,
     data: {
-      unread_count: unreadCount,
+      unread_count: result?.count || 0,
     },
   })
 }
 
-// 辅助函数：生成模拟通知
-function generateMockNotifications(): Array<{
-  id: string
-  title: string
-  message: string
-  type: string
-  read: boolean
-  created_at: string
-  data?: Record<string, unknown>
-}> {
-  const types = ['info', 'warning', 'error', 'success']
-  const templates = [
-    { title: 'Node Offline', message: 'Node "US-East-1" has gone offline', type: 'error' },
-    { title: 'High CPU Usage', message: 'Node "EU-West-2" CPU usage exceeded 90%', type: 'warning' },
-    { title: 'New User Registered', message: 'A new user has registered on the platform', type: 'info' },
-    { title: 'Backup Completed', message: 'Daily backup completed successfully', type: 'success' },
-    { title: 'SSL Certificate Expiring', message: 'SSL certificate for api.anixops.com expires in 7 days', type: 'warning' },
-    { title: 'Playbook Executed', message: 'Ansible playbook "deploy-app" completed successfully', type: 'success' },
-  ]
-
-  return templates.map((template, index) => ({
-    id: `notification-${index + 1}`,
-    title: template.title,
-    message: template.message,
-    type: template.type,
-    read: index > 2, // 前3条未读
-    created_at: new Date(Date.now() - index * 3600000).toISOString(),
-  }))
-}
-
-// 辅助函数：记录审计日志
-async function logAudit(
-  c: Context<{ Bindings: Env }>,
-  userId: number,
-  action: string,
-  resource: string,
-  details?: Record<string, unknown>
+/**
+ * 批量创建通知（内部使用）
+ */
+export async function createNotificationForUsers(
+  env: Env,
+  userIds: number[],
+  notification: {
+    type: 'info' | 'warning' | 'error' | 'success' | 'task' | 'system'
+    title: string
+    message: string
+    resource_type?: string
+    resource_id?: string
+    action_url?: string
+  }
 ) {
-  try {
-    await c.env.DB
+  for (const userId of userIds) {
+    await env.DB
       .prepare(`
-        INSERT INTO audit_logs (user_id, action, resource, ip, user_agent, details)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO notifications (user_id, type, title, message, resource_type, resource_id, action_url)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `)
       .bind(
         userId,
-        action,
-        resource,
-        c.req.header('CF-Connecting-IP') || null,
-        c.req.header('User-Agent') || null,
-        details ? JSON.stringify(details) : null
+        notification.type,
+        notification.title,
+        notification.message,
+        notification.resource_type || null,
+        notification.resource_id || null,
+        notification.action_url || null
       )
       .run()
-  } catch (err) {
-    console.error('Failed to log audit:', err)
   }
 }

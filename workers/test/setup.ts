@@ -107,6 +107,12 @@ export function createMockD1(): D1Database {
   const auditLogs: any[] = []
   const notifications: any[] = []
   const userMfa: any[] = []
+  const tenants: any[] = []
+  const tenantMembers: any[] = []
+  const roles: any[] = []
+  const permissions: any[] = []
+  const tenantInvitations: any[] = []
+  const taskLogs: any[] = []
   let idCounter = 1
 
   return {
@@ -203,6 +209,93 @@ export function createMockD1(): D1Database {
             return { count: 1, total: 1 }
           }
 
+          // Tenant queries
+          if (sqlLower.includes('insert into tenants') && sqlLower.includes('returning')) {
+            const tenant = {
+              id: idCounter++,
+              name: bindings[0],
+              slug: bindings[1],
+              plan: bindings[2] || 'free',
+              status: 'active',
+              quotas: bindings[3],
+              billing_email: bindings[4] || null,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+            tenants.push(tenant)
+            return tenant
+          }
+          if (sqlLower.includes('from tenants where id')) {
+            return tenants.find(t => t.id === bindings[0]) || null
+          }
+          if (sqlLower.includes('from tenants where slug')) {
+            return tenants.find(t => t.slug === bindings[0]) || null
+          }
+
+          // Role queries
+          if (sqlLower.includes('from roles where id')) {
+            return roles.find(r => r.id === bindings[0]) || null
+          }
+          if (sqlLower.includes('from roles where name')) {
+            return roles.find(r => r.name === bindings[0]) || null
+          }
+          if (sqlLower.includes('insert into roles') && sqlLower.includes('returning')) {
+            const role = {
+              id: idCounter++,
+              tenant_id: bindings[0],
+              name: bindings[1],
+              display_name: bindings[2] || null,
+              description: bindings[3] || null,
+              permissions: bindings[4],
+              is_system: false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+            roles.push(role)
+            return role
+          }
+
+          // Tenant member queries
+          if (sqlLower.includes('from tenant_members where user_id')) {
+            return tenantMembers.find(m => m.user_id === bindings[0] && m.tenant_id === bindings[1]) || null
+          }
+          if (sqlLower.includes('insert into tenant_members') && sqlLower.includes('returning')) {
+            const member = {
+              id: idCounter++,
+              tenant_id: bindings[0],
+              user_id: bindings[1],
+              role_id: bindings[2] || null,
+              invited_by: bindings[3] || null,
+              joined_at: new Date().toISOString(),
+            }
+            tenantMembers.push(member)
+            return member
+          }
+
+          // Invitation queries
+          if (sqlLower.includes('from tenant_invitations where token')) {
+            return tenantInvitations.find(i => i.token === bindings[0]) || null
+          }
+          if (sqlLower.includes('insert into tenant_invitations') && sqlLower.includes('returning')) {
+            const invitation = {
+              id: idCounter++,
+              tenant_id: bindings[0],
+              email: bindings[1],
+              role_id: bindings[2] || null,
+              invited_by: bindings[3],
+              token: bindings[4],
+              expires_at: bindings[5],
+              created_at: new Date().toISOString(),
+            }
+            tenantInvitations.push(invitation)
+            return invitation
+          }
+
+          // Permission queries
+          if (sqlLower.includes('from permissions')) {
+            return { results: permissions }
+          }
+
           return null
         }),
         all: vi.fn(async function(this: any) {
@@ -225,6 +318,24 @@ export function createMockD1(): D1Database {
           }
           if (sqlLower.includes('from audit_logs')) {
             return { results: auditLogs }
+          }
+          if (sqlLower.includes('from tenants')) {
+            return { results: tenants }
+          }
+          if (sqlLower.includes('from tenant_members')) {
+            return { results: tenantMembers }
+          }
+          if (sqlLower.includes('from roles')) {
+            return { results: roles }
+          }
+          if (sqlLower.includes('from permissions')) {
+            return { results: permissions }
+          }
+          if (sqlLower.includes('from tenant_invitations')) {
+            return { results: tenantInvitations }
+          }
+          if (sqlLower.includes('from task_logs')) {
+            return { results: taskLogs }
           }
 
           return { results: [] }
@@ -293,6 +404,136 @@ export function createMockD1(): D1Database {
             const user = users.find(u => u.id === bindings[1])
             if (user) user.last_login_at = new Date().toISOString()
             return { success: true }
+          }
+
+          // INSERT tenant
+          if (sqlLower.includes('insert into tenants')) {
+            const tenant = {
+              id: idCounter++,
+              name: bindings[0],
+              slug: bindings[1],
+              plan: bindings[2] || 'free',
+              status: 'active',
+              quotas: bindings[3],
+              created_at: new Date().toISOString(),
+            }
+            tenants.push(tenant)
+            return { success: true, results: [tenant] }
+          }
+
+          // UPDATE tenant
+          if (sqlLower.includes('update tenants')) {
+            return { success: true, meta: { changes: 1 } }
+          }
+
+          // INSERT tenant member
+          if (sqlLower.includes('insert into tenant_members')) {
+            const member = {
+              id: idCounter++,
+              tenant_id: bindings[0],
+              user_id: bindings[1],
+              role_id: bindings[2] || null,
+              invited_by: bindings[3] || null,
+              joined_at: new Date().toISOString(),
+            }
+            tenantMembers.push(member)
+            return { success: true }
+          }
+
+          // DELETE tenant member
+          if (sqlLower.includes('delete from tenant_members')) {
+            const idx = tenantMembers.findIndex(m => m.tenant_id === bindings[0] && m.user_id === bindings[1])
+            if (idx >= 0) tenantMembers.splice(idx, 1)
+            return { success: true }
+          }
+
+          // INSERT role
+          if (sqlLower.includes('insert into roles')) {
+            const role = {
+              id: idCounter++,
+              tenant_id: bindings[0],
+              name: bindings[1],
+              display_name: bindings[2] || null,
+              description: bindings[3] || null,
+              permissions: bindings[4],
+              is_system: false,
+              created_at: new Date().toISOString(),
+            }
+            roles.push(role)
+            return { success: true }
+          }
+
+          // UPDATE role
+          if (sqlLower.includes('update roles')) {
+            return { success: true, meta: { changes: 1 } }
+          }
+
+          // DELETE role
+          if (sqlLower.includes('delete from roles')) {
+            const idx = roles.findIndex(r => r.id === bindings[0] && r.tenant_id === bindings[1])
+            if (idx >= 0) roles.splice(idx, 1)
+            return { success: true }
+          }
+
+          // INSERT tenant invitation
+          if (sqlLower.includes('insert into tenant_invitations')) {
+            const invitation = {
+              id: idCounter++,
+              tenant_id: bindings[0],
+              email: bindings[1],
+              role_id: bindings[2] || null,
+              invited_by: bindings[3],
+              token: bindings[4],
+              expires_at: bindings[5],
+              created_at: new Date().toISOString(),
+            }
+            tenantInvitations.push(invitation)
+            return { success: true }
+          }
+
+          // UPDATE tenant invitation
+          if (sqlLower.includes('update tenant_invitations')) {
+            return { success: true }
+          }
+
+          // DELETE tenant invitation
+          if (sqlLower.includes('delete from tenant_invitations')) {
+            const idx = tenantInvitations.findIndex(i => i.id === bindings[0])
+            if (idx >= 0) tenantInvitations.splice(idx, 1)
+            return { success: true }
+          }
+
+          // INSERT task log
+          if (sqlLower.includes('insert into task_logs')) {
+            const log = {
+              id: idCounter++,
+              task_id: bindings[0],
+              node_id: bindings[1] || null,
+              node_name: bindings[2] || null,
+              level: bindings[3],
+              message: bindings[4],
+              metadata: bindings[5] || null,
+              created_at: new Date().toISOString(),
+            }
+            taskLogs.push(log)
+            return { success: true }
+          }
+
+          // INSERT audit log
+          if (sqlLower.includes('insert into audit_logs')) {
+            const log = {
+              id: idCounter++,
+              tenant_id: bindings[0] || null,
+              user_id: bindings[1] || null,
+              action: bindings[2],
+              resource: bindings[3],
+              ip: bindings[4] || null,
+              user_agent: bindings[5] || null,
+              details: bindings[6] || null,
+              created_at: new Date().toISOString(),
+            }
+            auditLogs.push(log)
+            return { id: log.id }
           }
 
           return { success: true, meta: { changes: 1 } }

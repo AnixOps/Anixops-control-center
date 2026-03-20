@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { z } from 'zod'
 import type { Env } from '../types'
+import { logAudit } from '../utils/audit'
 
 const testConnectionSchema = z.object({
   host: z.string().min(1),
@@ -203,33 +204,5 @@ async function simulateSSHTest(data: z.infer<typeof testConnectionSchema>): Prom
     os: operatingSystems[Math.floor(Math.random() * operatingSystems.length)],
     version: versions[Math.floor(Math.random() * versions.length)],
     features: ['tls', 'websocket', 'grpc', 'http2'].filter(() => Math.random() > 0.5),
-  }
-}
-
-// 辅助函数：记录审计日志
-async function logAudit(
-  c: Context<{ Bindings: Env }>,
-  userId: number,
-  action: string,
-  resource: string,
-  details?: Record<string, unknown>
-) {
-  try {
-    await c.env.DB
-      .prepare(`
-        INSERT INTO audit_logs (user_id, action, resource, ip, user_agent, details)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `)
-      .bind(
-        userId,
-        action,
-        resource,
-        c.req.header('CF-Connecting-IP') || null,
-        c.req.header('User-Agent') || null,
-        details ? JSON.stringify(details) : null
-      )
-      .run()
-  } catch (err) {
-    console.error('Failed to log audit:', err)
   }
 }

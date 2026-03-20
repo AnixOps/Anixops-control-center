@@ -7,7 +7,16 @@ import {
   getRequiredParam,
   getClientIP,
   getUserAgent,
+  getRequestId,
   logAudit,
+  logAuditWithTenant,
+  getAuditLogs,
+  exportAuditLogsJSON,
+  exportAuditLogsCSV,
+  getAuditStats,
+  cleanupAuditLogs,
+  configureSIEM,
+  getSIEMConfig,
   AUDIT_CATEGORIES,
   formatAsCEF,
   formatAsSyslog,
@@ -112,6 +121,58 @@ describe('Audit Utilities', () => {
 
       // Should not throw
       await expect(logAudit(c, 1, 'test', 'test')).resolves.not.toThrow()
+    })
+  })
+
+  describe('logAuditWithTenant', () => {
+    it('should log audit with tenant context', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await logAuditWithTenant(
+        env,
+        1,
+        123,
+        'create_node',
+        'node',
+        { node_name: 'test-node' },
+        '192.168.1.1',
+        'TestAgent'
+      )
+
+      expect(typeof result).toBe('number')
+    })
+
+    it('should handle undefined user ID', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await logAuditWithTenant(
+        env,
+        1,
+        undefined,
+        'login',
+        'auth'
+      )
+
+      expect(typeof result).toBe('number')
+    })
+
+    it('should handle database errors', async () => {
+      const env = {
+        DB: {
+          prepare: vi.fn(() => ({
+            bind: vi.fn(() => ({
+              first: vi.fn(() => Promise.reject(new Error('DB error'))),
+            })),
+          })),
+        },
+        KV: createMockKV(),
+      } as any
+
+      const result = await logAuditWithTenant(env, 1, 1, 'test', 'test')
+
+      expect(result).toBe(0)
     })
   })
 
@@ -371,6 +432,202 @@ describe('Audit Utilities', () => {
       const totalPages = Math.ceil(total / perPage)
 
       expect(totalPages).toBe(0)
+    })
+  })
+
+  describe('getAuditLogs', () => {
+    it('should get audit logs with default options', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await getAuditLogs(env, {})
+
+      expect(result).toHaveProperty('logs')
+      expect(result).toHaveProperty('total')
+      expect(Array.isArray(result.logs)).toBe(true)
+    })
+
+    it('should filter by tenant ID', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await getAuditLogs(env, { tenantId: 1 })
+
+      expect(result).toHaveProperty('logs')
+    })
+
+    it('should filter by user ID', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await getAuditLogs(env, { userId: 1 })
+
+      expect(result).toHaveProperty('logs')
+    })
+
+    it('should filter by action', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await getAuditLogs(env, { action: 'login' })
+
+      expect(result).toHaveProperty('logs')
+    })
+
+    it('should filter by date range', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await getAuditLogs(env, {
+        startDate: '2024-01-01',
+        endDate: '2024-12-31',
+      })
+
+      expect(result).toHaveProperty('logs')
+    })
+
+    it('should support pagination', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await getAuditLogs(env, { page: 2, perPage: 10 })
+
+      expect(result).toHaveProperty('logs')
+    })
+  })
+
+  describe('exportAuditLogsJSON', () => {
+    it('should export logs as JSON', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await exportAuditLogsJSON(env, {})
+
+      expect(typeof result).toBe('string')
+      expect(() => JSON.parse(result)).not.toThrow()
+    })
+  })
+
+  describe('exportAuditLogsCSV', () => {
+    it('should export logs as CSV', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await exportAuditLogsCSV(env, {})
+
+      expect(typeof result).toBe('string')
+      expect(result).toContain('id,timestamp')
+    })
+  })
+
+  describe('getAuditStats', () => {
+    it('should return audit statistics', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const stats = await getAuditStats(env, undefined, 30)
+
+      expect(stats).toHaveProperty('total')
+      expect(stats).toHaveProperty('byAction')
+      expect(stats).toHaveProperty('byUser')
+      expect(stats).toHaveProperty('byResource')
+      expect(stats).toHaveProperty('failures')
+      expect(typeof stats.total).toBe('number')
+      expect(Array.isArray(stats.byAction)).toBe(true)
+    })
+
+    it('should filter by tenant ID', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const stats = await getAuditStats(env, 1, 30)
+
+      expect(stats).toHaveProperty('total')
+    })
+  })
+
+  describe('cleanupAuditLogs', () => {
+    it('should clean up old audit logs', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await cleanupAuditLogs(env, 90)
+
+      expect(result).toHaveProperty('deleted')
+      expect(typeof result.deleted).toBe('number')
+    })
+
+    it('should use default retention days', async () => {
+      const mockDB = createMockD1()
+      const env = { DB: mockDB, KV: createMockKV() } as any
+
+      const result = await cleanupAuditLogs(env)
+
+      expect(result).toHaveProperty('deleted')
+    })
+  })
+
+  describe('configureSIEM', () => {
+    it('should save SIEM configuration', async () => {
+      const mockKV = createMockKV()
+      const env = { DB: createMockD1(), KV: mockKV } as any
+
+      const config: SIEMConfig = {
+        enabled: true,
+        webhook_url: 'https://siem.example.com/webhook',
+        format: 'json',
+      }
+
+      await configureSIEM(env, config)
+
+      // Verify the config was saved
+      const saved = await mockKV.get('settings:siem', 'json')
+      expect(saved).toEqual(config)
+    })
+  })
+
+  describe('getSIEMConfig', () => {
+    it('should return null when no config', async () => {
+      const mockKV = createMockKV()
+      const env = { DB: createMockD1(), KV: mockKV } as any
+
+      const config = await getSIEMConfig(env)
+
+      expect(config).toBeNull()
+    })
+
+    it('should return saved config', async () => {
+      const mockKV = createMockKV()
+      const env = { DB: createMockD1(), KV: mockKV } as any
+
+      const testConfig: SIEMConfig = {
+        enabled: true,
+        webhook_url: 'https://test.example.com',
+        format: 'cef',
+        api_key: 'test-key',
+      }
+
+      await mockKV.put('settings:siem', JSON.stringify(testConfig))
+
+      const config = await getSIEMConfig(env)
+
+      expect(config).not.toBeNull()
+      expect(config!.enabled).toBe(true)
+      expect(config!.format).toBe('cef')
+    })
+  })
+
+  describe('getRequestId', () => {
+    it('should return request ID from header', () => {
+      const c = createMockContext({ headers: { 'X-Request-ID': 'req-123' } })
+      const result = getRequestId(c)
+      expect(result).toBe('req-123')
+    })
+
+    it('should generate UUID when header is missing', () => {
+      const c = createMockContext({ headers: {} })
+      const result = getRequestId(c)
+      expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)
     })
   })
 })

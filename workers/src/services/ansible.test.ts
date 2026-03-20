@@ -2,16 +2,34 @@
  * Ansible Service Unit Tests
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
   parsePlaybook,
   generateExecutionCommands,
   parseValue,
+  executePlaybookOnNode,
+  processTaskQueue,
+  getExecutionResult,
+  logExecutionEvent,
+  updateTaskStatus,
+  retryFailedTask,
+  cancelTask,
   type ParsedPlaybook,
   type ExecutionOptions,
+  type TaskQueueItem,
 } from './ansible'
+import { createMockKV, createMockR2, createMockD1 } from '../../test/setup'
 
 describe('Ansible Service', () => {
+  let mockEnv: any
+
+  beforeEach(() => {
+    mockEnv = {
+      DB: createMockD1(),
+      KV: createMockKV(),
+      R2: createMockR2(),
+    }
+  })
   describe('parseValue', () => {
     it('should parse boolean yes', () => {
       expect(parseValue('yes')).toBe(true)
@@ -236,6 +254,155 @@ describe('Ansible Service', () => {
 
       expect(queueItem.task_id).toBe('test-123')
       expect(queueItem.nodes.length).toBe(1)
+    })
+  })
+
+  describe('executePlaybookOnNode', () => {
+    it('should fail for node without agent', async () => {
+      const result = await executePlaybookOnNode(
+        mockEnv,
+        'task-123',
+        999,
+        'test-node',
+        '---\n- name: Test\n  hosts: all\n  tasks: []',
+        'test-playbook',
+        {}
+      )
+
+      expect(result.status).toBe('failed')
+      expect(result.error).toBe('Node has no registered agent')
+    })
+  })
+
+  describe('processTaskQueue', () => {
+    it('should process empty queue', async () => {
+      await expect(processTaskQueue(mockEnv)).resolves.not.toThrow()
+    })
+
+    it('should process queued task', async () => {
+      // Add a task to queue
+      const queueItem: TaskQueueItem = {
+        task_id: 'test-task-1',
+        playbook_id: 1,
+        playbook_name: 'test-playbook',
+        storage_key: 'playbooks/test.yml',
+        nodes: [{ id: 1, name: 'node1', host: '192.168.1.1' }],
+        variables: {},
+        triggered_by: 1,
+        created_at: new Date().toISOString(),
+      }
+
+      await mockEnv.KV.put('task:queue:test-task-1', JSON.stringify(queueItem))
+      await mockEnv.R2.put('playbooks/test.yml', '---\n- name: Test\n  hosts: all\n  tasks: []')
+
+      await processTaskQueue(mockEnv)
+
+      // Task should be removed from queue
+      const remaining = await mockEnv.KV.get('task:queue:test-task-1')
+      expect(remaining).toBeNull()
+    })
+  })
+
+  describe('getExecutionResult', () => {
+    it('should return null for non-existent task', async () => {
+      const result = await getExecutionResult(mockEnv, 'non-existent')
+      expect(result).toBeNull()
+    })
+
+    it('should return stored result', async () => {
+      const mockResult = {
+        task_id: 'test-task',
+        playbook_name: 'test',
+        status: 'success',
+        total_nodes: 1,
+        successful_nodes: 1,
+        failed_nodes: 0,
+        started_at: new Date().toISOString(),
+        node_results: [],
+      }
+
+      await mockEnv.KV.put('task:result:test-task', JSON.stringify(mockResult))
+
+      const result = await getExecutionResult(mockEnv, 'test-task')
+      expect(result).not.toBeNull()
+      expect(result!.task_id).toBe('test-task')
+    })
+  })
+
+  describe('logExecutionEvent', () => {
+    it('should log execution event', async () => {
+      await expect(
+        logExecutionEvent(mockEnv, 'task-1', 1, 'node1', 'info', 'Test message')
+      ).resolves.not.toThrow()
+    })
+
+    it('should log with metadata', async () => {
+      await expect(
+        logExecutionEvent(
+          mockEnv,
+          'task-1',
+          1,
+          'node1',
+          'error',
+          'Error occurred',
+          { error: 'test error' }
+        )
+      ).resolves.not.toThrow()
+    })
+  })
+
+  describe('updateTaskStatus', () => {
+    it('should update task status to running', async () => {
+      await expect(
+        updateTaskStatus(mockEnv, 'task-1', 'running')
+      ).resolves.not.toThrow()
+    })
+
+    it('should update task status to success', async () => {
+      await expect(
+        updateTaskStatus(mockEnv, 'task-1', 'success', { output: 'done' })
+      ).resolves.not.toThrow()
+    })
+
+    it('should update task status to failed with error', async () => {
+      await expect(
+        updateTaskStatus(mockEnv, 'task-1', 'failed', undefined, 'Something went wrong')
+      ).resolves.not.toThrow()
+    })
+
+    it('should update task status to cancelled', async () => {
+      await expect(
+        updateTaskStatus(mockEnv, 'task-1', 'cancelled')
+      ).resolves.not.toThrow()
+    })
+
+    it('should update task status to timeout', async () => {
+      await expect(
+        updateTaskStatus(mockEnv, 'task-1', 'timeout')
+      ).resolves.not.toThrow()
+    })
+  })
+
+  describe('retryFailedTask', () => {
+    it('should return false for non-existent task', async () => {
+      const result = await retryFailedTask(mockEnv, 'non-existent')
+      expect(result).toBe(false)
+    })
+  })
+
+  describe('cancelTask', () => {
+    it('should cancel task', async () => {
+      const result = await cancelTask(mockEnv, 'task-to-cancel')
+      expect(result).toBe(true)
+    })
+
+    it('should remove task from queue', async () => {
+      await mockEnv.KV.put('task:queue:task-to-cancel', '{"task_id":"task-to-cancel"}')
+
+      await cancelTask(mockEnv, 'task-to-cancel')
+
+      const remaining = await mockEnv.KV.get('task:queue:task-to-cancel')
+      expect(remaining).toBeNull()
     })
   })
 })

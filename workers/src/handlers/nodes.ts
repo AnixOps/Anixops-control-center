@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import { z } from 'zod'
 import type { Env, Node } from '../types'
+import { logAudit } from '../utils/audit'
 
 const createNodeSchema = z.object({
   name: z.string().min(1).max(100),
@@ -64,7 +65,7 @@ export async function listNodesHandler(c: Context<{ Bindings: Env }>) {
  * 获取单个节点
  */
 export async function getNodeHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
 
   const node = await c.env.DB
     .prepare('SELECT * FROM nodes WHERE id = ?')
@@ -133,7 +134,7 @@ export async function createNodeHandler(c: Context<{ Bindings: Env }>) {
  * 更新节点
  */
 export async function updateNodeHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
   const user = c.get('user')
 
   try {
@@ -205,7 +206,7 @@ export async function updateNodeHandler(c: Context<{ Bindings: Env }>) {
  * 删除节点
  */
 export async function deleteNodeHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
   const user = c.get('user')
 
   const result = await c.env.DB
@@ -229,7 +230,7 @@ export async function deleteNodeHandler(c: Context<{ Bindings: Env }>) {
  * 启动节点
  */
 export async function startNodeHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
   const user = c.get('user')
 
   const node = await c.env.DB
@@ -266,7 +267,7 @@ export async function startNodeHandler(c: Context<{ Bindings: Env }>) {
  * 停止节点
  */
 export async function stopNodeHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
   const user = c.get('user')
 
   const node = await c.env.DB
@@ -302,7 +303,7 @@ export async function stopNodeHandler(c: Context<{ Bindings: Env }>) {
  * 重启节点
  */
 export async function restartNodeHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
   const user = c.get('user')
 
   const node = await c.env.DB
@@ -338,7 +339,7 @@ export async function restartNodeHandler(c: Context<{ Bindings: Env }>) {
  * 获取节点统计信息
  */
 export async function getNodeStatsHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
 
   const node = await c.env.DB
     .prepare('SELECT * FROM nodes WHERE id = ?')
@@ -389,7 +390,7 @@ export async function getNodeStatsHandler(c: Context<{ Bindings: Env }>) {
  * 获取节点日志
  */
 export async function getNodeLogsHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
   const limit = Math.min(parseInt(c.req.query('limit') || '100'), 1000)
   const level = c.req.query('level') // info, warn, error
 
@@ -435,7 +436,7 @@ export async function getNodeLogsHandler(c: Context<{ Bindings: Env }>) {
  * 测试节点连接
  */
 export async function testNodeConnectionHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
 
   const node = await c.env.DB
     .prepare('SELECT * FROM nodes WHERE id = ?')
@@ -475,7 +476,7 @@ export async function testNodeConnectionHandler(c: Context<{ Bindings: Env }>) {
  * 同步节点配置
  */
 export async function syncNodeHandler(c: Context<{ Bindings: Env }>) {
-  const id = c.req.param('id')
+  const id = c.req.param('id') as string
   const user = c.get('user')
 
   const node = await c.env.DB
@@ -635,29 +636,3 @@ function generateMockLogs(status: string): Array<{ timestamp: string; level: str
   return logs.sort((a, b) => b.timestamp.localeCompare(a.timestamp))
 }
 
-async function logAudit(
-  c: Context<{ Bindings: Env }>,
-  userId: number,
-  action: string,
-  resource: string,
-  details?: Record<string, unknown>
-) {
-  try {
-    await c.env.DB
-      .prepare(`
-        INSERT INTO audit_logs (user_id, action, resource, ip, user_agent, details)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `)
-      .bind(
-        userId,
-        action,
-        resource,
-        c.req.header('CF-Connecting-IP') || null,
-        c.req.header('User-Agent') || null,
-        details ? JSON.stringify(details) : null
-      )
-      .run()
-  } catch (err) {
-    console.error('Failed to log audit:', err)
-  }
-}
