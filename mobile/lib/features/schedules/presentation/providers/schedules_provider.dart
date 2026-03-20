@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/services/schedules_api.dart';
-import '../../../core/providers/api_providers.dart';
+import '../../../../core/services/schedules_api.dart';
+import '../../../../core/providers/api_providers.dart';
 
 /// Schedules state
 class SchedulesState {
