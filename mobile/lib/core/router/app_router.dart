@@ -14,7 +14,9 @@ import '../../features/logs/presentation/pages/logs_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/playbooks/presentation/pages/playbooks_page.dart';
+import '../../features/playbooks/presentation/pages/playbook_detail_page.dart';
 import '../../features/tasks/presentation/pages/tasks_page.dart';
+import '../../features/tasks/presentation/pages/task_detail_page.dart';
 import '../../features/schedules/presentation/pages/schedules_page.dart';
 
 import '../../features/auth/presentation/providers/auth_provider.dart';
@@ -68,14 +70,38 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const NodesPage(),
           ),
           GoRoute(
+            path: '/nodes/:id',
+            name: 'node-detail',
+            builder: (context, state) {
+              final id = state.pathParameters['id']!;
+              return NodeDetailPage(nodeId: id);
+            },
+          ),
+          GoRoute(
             path: '/playbooks',
             name: 'playbooks',
             builder: (context, state) => const PlaybooksPage(),
           ),
           GoRoute(
+            path: '/playbooks/:name',
+            name: 'playbook-detail',
+            builder: (context, state) {
+              final name = state.pathParameters['name']!;
+              return PlaybookDetailPage(playbookName: name);
+            },
+          ),
+          GoRoute(
             path: '/tasks',
             name: 'tasks',
             builder: (context, state) => const TasksPage(),
+          ),
+          GoRoute(
+            path: '/tasks/:id',
+            name: 'task-detail',
+            builder: (context, state) {
+              final id = state.pathParameters['id']!;
+              return TaskDetailPage(taskId: id);
+            },
           ),
           GoRoute(
             path: '/schedules',
