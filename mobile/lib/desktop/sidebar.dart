@@ -230,6 +230,7 @@ class DesktopSidebar extends ConsumerWidget {
       _NavItemData(Icons.dashboard_rounded, 'Dashboard', '/dashboard'),
       _NavItemData(Icons.dns_rounded, 'Nodes', '/nodes'),
       _NavItemData(Icons.play_circle_rounded, 'Playbooks', '/playbooks'),
+      _NavItemData(Icons.task_rounded, 'Tasks', '/tasks'),
       _NavItemData(Icons.extension_rounded, 'Plugins', '/plugins'),
     ];
 
