@@ -64,6 +64,7 @@ class SchedulesNotifier extends StateNotifier<SchedulesState> {
     String timezone = 'UTC',
     required List<dynamic> targetNodes,
     Map<String, dynamic>? variables,
+    bool enabled = true,
   }) async {
     try {
       final schedule = await _api.createSchedule(
@@ -73,6 +74,7 @@ class SchedulesNotifier extends StateNotifier<SchedulesState> {
         timezone: timezone,
         targetNodes: targetNodes,
         variables: variables,
+        enabled: enabled,
       );
       await loadSchedules();
       return schedule;

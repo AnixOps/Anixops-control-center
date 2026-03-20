@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/services/schedules_api.dart';
-import '../../../core/providers/api_providers.dart';
+import '../../../../core/services/schedules_api.dart';
+import '../../../../core/providers/api_providers.dart';
 import '../providers/schedules_provider.dart';
 
 class SchedulesPage extends ConsumerStatefulWidget {
