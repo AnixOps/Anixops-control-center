@@ -67,18 +67,18 @@ type Agent struct {
 
 // AgentInfo contains information about the agent and its host
 type AgentInfo struct {
-	AgentID    string            `json:"agent_id"`
-	Hostname   string            `json:"hostname"`
-	IPAddress  string            `json:"ip_address"`
-	OS         string            `json:"os"`
-	Arch       string            `json:"arch"`
-	Version    string            `json:"version"`
-	Labels     map[string]string `json:"labels"`
-	LastSeen   time.Time         `json:"last_seen"`
-	Status     string            `json:"status"`
-	CPUCount   int               `json:"cpu_count"`
-	MemoryGB   float64           `json:"memory_gb"`
-	DiskGB     float64           `json:"disk_gb"`
+	AgentID   string            `json:"agent_id"`
+	Hostname  string            `json:"hostname"`
+	IPAddress string            `json:"ip_address"`
+	OS        string            `json:"os"`
+	Arch      string            `json:"arch"`
+	Version   string            `json:"version"`
+	Labels    map[string]string `json:"labels"`
+	LastSeen  time.Time         `json:"last_seen"`
+	Status    string            `json:"status"`
+	CPUCount  int               `json:"cpu_count"`
+	MemoryGB  float64           `json:"memory_gb"`
+	DiskGB    float64           `json:"disk_gb"`
 }
 
 // CommandHandler handles incoming commands from the control center
@@ -89,21 +89,21 @@ type MetricProvider func() (*Metrics, error)
 
 // Command represents a command from the control center
 type Command struct {
-	ID       string                 `json:"id"`
-	Type     string                 `json:"type"`
-	Payload  map[string]interface{} `json:"payload"`
-	Timeout  time.Duration          `json:"timeout"`
-	CreatedAt time.Time             `json:"created_at"`
+	ID        string                 `json:"id"`
+	Type      string                 `json:"type"`
+	Payload   map[string]interface{} `json:"payload"`
+	Timeout   time.Duration          `json:"timeout"`
+	CreatedAt time.Time              `json:"created_at"`
 }
 
 // CommandResult is the result of command execution
 type CommandResult struct {
-	CommandID string          `json:"command_id"`
-	Success   bool            `json:"success"`
-	Output    string          `json:"output"`
-	Error     string          `json:"error"`
-	Metadata  map[string]any  `json:"metadata,omitempty"`
-	Duration  time.Duration   `json:"duration"`
+	CommandID string         `json:"command_id"`
+	Success   bool           `json:"success"`
+	Output    string         `json:"output"`
+	Error     string         `json:"error"`
+	Metadata  map[string]any `json:"metadata,omitempty"`
+	Duration  time.Duration  `json:"duration"`
 }
 
 // Metrics contains system metrics
