@@ -3,7 +3,7 @@ description: AnixOps Control Center Mobile App
 
 publish_to: 'none'
 
-version: 1.0.0-rc.1+4
+version: 2.4.0-rc.20+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
