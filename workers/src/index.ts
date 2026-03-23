@@ -21,6 +21,29 @@ import { listNodeGroupsHandler, getNodeGroupHandler, createNodeGroupHandler, upd
 import { sseHandler, sseSubscribeHandler, sseUnsubscribeHandler, sseStatusHandler } from './handlers/sse'
 import { websocketHandler } from './handlers/websocket'
 import { createBackupHandler, listBackupsHandler, getBackupHandler, deleteBackupHandler, downloadBackupHandler, restoreBackupHandler, cleanupBackupsHandler, backupStatusHandler } from './handlers/backup'
+
+// AI Services
+import {
+  aiChatHandler,
+  aiAnalyzeLogHandler,
+  aiOpsAdviceHandler,
+  aiEmbeddingHandler,
+  aiQueryHandler,
+} from './services/ai'
+import {
+  vectorSearchHandler,
+  vectorInsertHandler,
+  vectorDeleteHandler,
+} from './services/vectorize'
+
+// Web3 Services
+import {
+  ipfsUploadHandler,
+  ipfsGetHandler,
+  web3ChallengeHandler,
+  web3VerifyHandler,
+  web3AuditHandler,
+} from './services/web3'
 import {
   registerAgentHandler,
   agentHeartbeatHandler,
@@ -369,6 +392,40 @@ app.post('/api/v1/lb/:id/targets/:targetId/complete', authMiddleware, recordComp
 // ==================== WebSocket ====================
 // WebSocket 实时通信端点
 app.get('/api/v1/ws', authMiddleware, websocketHandler)
+
+// ==================== AI Services ====================
+// AI 聊天助手
+app.post('/api/v1/ai/chat', authMiddleware, aiChatHandler)
+// AI 日志分析
+app.post('/api/v1/ai/analyze-log', authMiddleware, aiAnalyzeLogHandler)
+// AI 运维建议
+app.post('/api/v1/ai/ops-advice', authMiddleware, aiOpsAdviceHandler)
+// AI 文本嵌入
+app.post('/api/v1/ai/embedding', authMiddleware, aiEmbeddingHandler)
+// AI 查询转换
+app.post('/api/v1/ai/query', authMiddleware, aiQueryHandler)
+
+// ==================== Vectorize ====================
+// 向量搜索
+app.post('/api/v1/vectors/search', authMiddleware, vectorSearchHandler)
+// 向量插入
+app.post('/api/v1/vectors', authMiddleware, vectorInsertHandler)
+// 向量删除
+app.delete('/api/v1/vectors/:id', authMiddleware, vectorDeleteHandler)
+
+// ==================== Web3 / IPFS ====================
+// IPFS 上传
+app.post('/api/v1/ipfs/upload', authMiddleware, ipfsUploadHandler)
+// IPFS 获取
+app.get('/api/v1/ipfs/:cid', ipfsGetHandler)
+
+// ==================== Web3 / Ethereum ====================
+// Web3 登录挑战
+app.post('/api/v1/web3/challenge', web3ChallengeHandler)
+// Web3 登录验证
+app.post('/api/v1/web3/verify', web3VerifyHandler)
+// 链上审计
+app.post('/api/v1/web3/audit', authMiddleware, web3AuditHandler)
 
 // ==================== 错误处理 ====================
 

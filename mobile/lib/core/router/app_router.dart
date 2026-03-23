@@ -18,6 +18,8 @@ import '../../features/playbooks/presentation/pages/playbook_detail_page.dart';
 import '../../features/tasks/presentation/pages/tasks_page.dart';
 import '../../features/tasks/presentation/pages/task_detail_page.dart';
 import '../../features/schedules/presentation/pages/schedules_page.dart';
+import '../../features/ai/presentation/pages/ai_assistant_page.dart';
+import '../../features/web3/presentation/pages/web3_dashboard_page.dart';
 
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../shared/presentation/pages/main_shell.dart';
@@ -132,6 +134,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/notifications',
             name: 'notifications',
             builder: (context, state) => const NotificationsPage(),
+          ),
+          GoRoute(
+            path: '/ai',
+            name: 'ai',
+            builder: (context, state) => const AIAssistantPage(),
+          ),
+          GoRoute(
+            path: '/web3',
+            name: 'web3',
+            builder: (context, state) => const Web3DashboardPage(),
           ),
         ],
       ),

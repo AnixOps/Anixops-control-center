@@ -83,6 +83,15 @@ id = "35a39ccc4cea47e89aa8b1459f85e1cf"
 binding = "R2"
 bucket_name = "anixops-files"
 
+# Workers AI 绑定
+[ai]
+binding = "AI"
+
+# Vectorize 向量数据库绑定
+[[vectorize]]
+binding = "VECTORIZE"
+index_name = "anixops-embeddings"
+
 # Durable Objects (实时通信) - 暂时禁用以调试
 # [[durable_objects.bindings]]
 # name = "WEBSOCKET_SERVER"

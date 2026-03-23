@@ -67,6 +67,18 @@ const routes = [
     name: 'Settings',
     component: () => import('@/views/Settings.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/ai',
+    name: 'AIAssistant',
+    component: () => import('@/views/AIAssistant.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/web3',
+    name: 'Web3Dashboard',
+    component: () => import('@/views/Web3Dashboard.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 

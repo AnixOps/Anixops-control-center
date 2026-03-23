@@ -243,6 +243,8 @@ class DesktopSidebar extends ConsumerWidget {
     // Items available to all users
     items.addAll([
       _NavItemData(Icons.description_rounded, 'Logs', '/logs'),
+      _NavItemData(Icons.psychology_rounded, 'AI Assistant', '/ai'),
+      _NavItemData(Icons.token_rounded, 'Web3', '/web3'),
       _NavItemData(Icons.notifications_rounded, 'Notifications', '/notifications'),
       _NavItemData(Icons.settings_rounded, 'Settings', '/settings'),
     ]);
