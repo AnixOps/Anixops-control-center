@@ -7,12 +7,19 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.9`
-**Date**: 2026-03-20
+**Version**: `v2.0.0-rc.11`
+**Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.9
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.11
 
-## Recent Changes (v2.0.0-rc.9)
+## Recent Changes (v2.0.0-rc.11)
+- Add Notifications page for Web Frontend
+- Add notifications_provider for Flutter
+- Add notifications_provider_test.dart
+- Update Sidebar with Tasks, Schedules, Notifications
+- Flutter: 86 tests, Workers: 342 tests
+
+## Recent Changes (v2.0.0-rc.10)
 - Add Tasks and Schedules pages to Web Frontend
 - Implement full logs page with filtering and streaming
 - Add NotificationsApi and BackupApi services
