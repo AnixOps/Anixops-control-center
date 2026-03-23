@@ -7,18 +7,23 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.27`
+**Version**: `v2.0.0-rc.28`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.27
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.28
 
 ## Test Summary
 | Platform | Tests | Status |
 |----------|-------|--------|
 | Web Frontend | 145 | ✅ Passing |
 | Mobile App | 141 | ✅ Passing |
-| Workers API | 342 | ✅ Passing |
-| **Total** | **628** | ✅ |
+| Workers API | 366 | ✅ Passing |
+| **Total** | **652** | ✅ |
+
+## Recent Changes (v2.0.0-rc.28)
+- Add monitoring service with metrics and alerting
+- Add health checks and dashboard configuration
+- Web: 145, Mobile: 141, Workers: 366 tests
 
 ## Recent Changes (v2.0.0-rc.27)
 - Add validation.store.test.js with 21 tests
