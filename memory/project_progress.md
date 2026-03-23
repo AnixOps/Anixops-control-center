@@ -7,10 +7,15 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.12`
+**Version**: `v2.0.0-rc.13`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.12
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.13
+
+## Recent Changes (v2.0.0-rc.13)
+- Add backup_provider_test.dart with model tests
+- Test Backup and BackupStatus models
+- Flutter: 92 tests, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.12)
 - Add backup_provider.dart for Flutter mobile
