@@ -6,28 +6,36 @@ type: project
 
 # AnixOps Workers API Progress
 
-## Latest Release
-**Version**: `v2.0.0-rc.28`
+## v2.1.x - Istio Service Mesh Integration
+
+### Latest Release
+**Version**: `v2.1.0-rc.1`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.28
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.1.0-rc.1
 
 ## Test Summary
 | Platform | Tests | Status |
 |----------|-------|--------|
 | Web Frontend | 145 | ✅ Passing |
 | Mobile App | 141 | ✅ Passing |
-| Workers API | 366 | ✅ Passing |
-| **Total** | **652** | ✅ |
+| Workers API | 385 | ✅ Passing |
+| **Total** | **671** | ✅ |
 
-## Recent Changes (v2.0.0-rc.28)
+## Recent Changes (v2.1.0-rc.1)
+- Add service discovery and registry
+- Add load balancing algorithms
+- Add mesh topology generation
+- Web: 145, Mobile: 141, Workers: 385 tests
+
+## v2.0.x - Kubernetes Operator & Helm Charts
+
+### v2.0.0-rc.28
 - Add monitoring service with metrics and alerting
-- Add health checks and dashboard configuration
 - Web: 145, Mobile: 141, Workers: 366 tests
 
-## Recent Changes (v2.0.0-rc.27)
+### v2.0.0-rc.27
 - Add validation.store.test.js with 21 tests
-- Add email, password, IP, port, cron validation tests
 - Web: 145, Mobile: 141, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.26)
