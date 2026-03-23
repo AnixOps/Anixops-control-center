@@ -9,23 +9,24 @@ type: project
 ## v2.1.x - Istio Service Mesh Integration
 
 ### Latest Release
-**Version**: `v2.1.0-rc.6`
+**Version**: `v2.1.0-rc.7`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.1.0-rc.6
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.1.0-rc.7
 
 ## Test Summary
 | Platform | Tests | Status |
 |----------|-------|--------|
 | Web Frontend | 205 | ✅ Passing |
 | Mobile App | 172 | ✅ Passing |
-| Workers API | 405 | ✅ Passing |
-| **Total** | **782** | ✅ |
+| Workers API | 429 | ✅ Passing |
+| **Total** | **806** | ✅ |
 
-## Recent Changes (v2.1.0-rc.6)
-- Add monitoring_provider_test.dart with 17 tests
-- Add tracing_provider_test.dart with 16 tests
-- Mobile: 172, Web: 205, Workers: 405 tests
+## Recent Changes (v2.1.0-rc.7)
+- Add ELK observability service for v2.2
+- Add Elasticsearch index templates, ILM policies
+- Add Logstash pipeline configurations
+- Workers: 429 tests (up from 405)
 
 ## Recent Changes (v2.1.0-rc.1)
 - Add service discovery and registry
