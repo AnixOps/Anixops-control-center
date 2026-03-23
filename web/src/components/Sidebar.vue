@@ -56,6 +56,8 @@ import {
   UsersIcon,
   DocumentTextIcon,
   ClipboardDocumentListIcon,
+  CalendarIcon,
+  BellIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon
 } from '@heroicons/vue/24/outline'
@@ -70,7 +72,10 @@ const menuItems = [
   { name: 'Agents', path: '/agents', icon: ComputerDesktopIcon },
   { name: 'Users', path: '/users', icon: UsersIcon },
   { name: 'Playbooks', path: '/playbooks', icon: DocumentTextIcon },
+  { name: 'Tasks', path: '/tasks', icon: ClipboardDocumentListIcon },
+  { name: 'Schedules', path: '/schedules', icon: CalendarIcon },
   { name: 'Logs', path: '/logs', icon: ClipboardDocumentListIcon },
+  { name: 'Notifications', path: '/notifications', icon: BellIcon },
   { name: 'Settings', path: '/settings', icon: Cog6ToothIcon }
 ]
 
