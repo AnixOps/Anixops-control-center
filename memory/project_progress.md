@@ -9,23 +9,27 @@ type: project
 ## v2.1.x - Istio Service Mesh Integration
 
 ### Latest Release
-**Version**: `v2.1.0-rc.1`
+**Version**: `v2.1.0-rc.2`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.1.0-rc.1
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.1.0-rc.2
 
 ## Test Summary
 | Platform | Tests | Status |
 |----------|-------|--------|
 | Web Frontend | 145 | ✅ Passing |
 | Mobile App | 141 | ✅ Passing |
-| Workers API | 385 | ✅ Passing |
-| **Total** | **671** | ✅ |
+| Workers API | 405 | ✅ Passing |
+| **Total** | **691** | ✅ |
+
+## Recent Changes (v2.1.0-rc.2)
+- Add distributed tracing service
+- Add OpenTelemetry compatibility
+- Web: 145, Mobile: 141, Workers: 405 tests
 
 ## Recent Changes (v2.1.0-rc.1)
 - Add service discovery and registry
 - Add load balancing algorithms
-- Add mesh topology generation
 - Web: 145, Mobile: 141, Workers: 385 tests
 
 ## v2.0.x - Kubernetes Operator & Helm Charts
