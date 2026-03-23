@@ -9,24 +9,30 @@ type: project
 ## v2.1.x - Istio Service Mesh Integration
 
 ### Latest Release
-**Version**: `v2.1.0-rc.7`
+**Version**: `v2.2.0-rc.1`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.1.0-rc.7
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.2.0-rc.1
 
 ## Test Summary
 | Platform | Tests | Status |
 |----------|-------|--------|
-| Web Frontend | 205 | ✅ Passing |
+| Web Frontend | 230 | ✅ Passing |
 | Mobile App | 172 | ✅ Passing |
 | Workers API | 429 | ✅ Passing |
-| **Total** | **806** | ✅ |
+| **Total** | **831** | ✅ |
 
-## Recent Changes (v2.1.0-rc.7)
-- Add ELK observability service for v2.2
-- Add Elasticsearch index templates, ILM policies
-- Add Logstash pipeline configurations
-- Workers: 429 tests (up from 405)
+## Recent Changes (v2.2.0-rc.1)
+- Add ELK Stack view with cluster health, indices, templates
+- Add ILM policies, Logstash pipelines, Kibana dashboards
+- Add elk.store.test.js with 25 tests
+- Web: 230 tests (up from 205)
+
+## v2.2.x - ELK Observability Stack
+- ✅ Elasticsearch index templates and ILM policies
+- ✅ Logstash pipeline configurations
+- ✅ Kibana dashboards management
+- ✅ Cluster health and index statistics
 
 ## Recent Changes (v2.1.0-rc.1)
 - Add service discovery and registry
