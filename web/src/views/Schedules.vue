@@ -6,7 +6,7 @@
         <button class="btn btn-primary" @click="showCreateDialog = true">
           <span class="icon">➕</span> New Schedule
         </button>
-        <button class="btn btn-secondary" @click="fetchSchedules">
+        <button class="btn btn-secondary" @click="schedulesStore.fetchSchedules()">
           <span class="icon">🔄</span> Refresh
         </button>
       </div>
@@ -17,34 +17,46 @@
       <div class="stat-card">
         <div class="stat-icon total">📅</div>
         <div class="stat-info">
-          <span class="stat-value">{{ schedules.length }}</span>
+          <span class="stat-value">{{ schedulesStore.schedules.length }}</span>
           <span class="stat-label">Total Schedules</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon enabled">✅</div>
         <div class="stat-info">
-          <span class="stat-value">{{ enabledCount }}</span>
+          <span class="stat-value">{{ schedulesStore.enabledCount }}</span>
           <span class="stat-label">Enabled</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon disabled">⏸️</div>
         <div class="stat-info">
-          <span class="stat-value">{{ disabledCount }}</span>
+          <span class="stat-value">{{ schedulesStore.disabledCount }}</span>
           <span class="stat-label">Disabled</span>
         </div>
       </div>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="schedulesStore.loading" class="loading-container">
+      <div class="spinner"></div>
+      <span>Loading schedules...</span>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="schedulesStore.error" class="error-message">
+      {{ schedulesStore.error }}
+    </div>
+
+    <!-- Empty State -->
+    <div v-else-if="schedulesStore.schedules.length === 0" class="empty-state">
+      No schedules found. Create one to get started.
+    </div>
+
     <!-- Schedules Grid -->
-    <div class="schedules-grid">
-      <div v-if="loading" class="loading-state">Loading...</div>
-      <div v-else-if="schedules.length === 0" class="empty-state">
-        No schedules found. Create one to get started.
-      </div>
-      <div v-else class="schedule-cards">
-        <div v-for="schedule in schedules" :key="schedule.id" class="schedule-card">
+    <div v-else class="schedules-grid">
+      <div class="schedule-cards">
+        <div v-for="schedule in schedulesStore.schedules" :key="schedule.id" class="schedule-card">
           <div class="card-header">
             <div class="schedule-name">
               <h3>{{ schedule.name }}</h3>
@@ -70,7 +82,7 @@
           <div class="card-body">
             <div class="info-row">
               <span class="label">Playbook:</span>
-              <span class="value">{{ schedule.playbook_name || '-' }}</span>
+              <span class="value">{{ schedule.playbookName || schedule.playbook_name || '-' }}</span>
             </div>
             <div class="info-row">
               <span class="label">Schedule:</span>
@@ -85,15 +97,15 @@
             </div>
             <div class="info-row">
               <span class="label">Target Nodes:</span>
-              <span class="value">{{ schedule.target_nodes?.length || 0 }} nodes</span>
+              <span class="value">{{ schedule.targetNodes?.length || schedule.target_nodes?.length || 0 }} nodes</span>
             </div>
-            <div v-if="schedule.next_run" class="info-row">
+            <div v-if="schedule.nextRun || schedule.next_run" class="info-row">
               <span class="label">Next Run:</span>
-              <span class="value">{{ formatDate(schedule.next_run) }}</span>
+              <span class="value">{{ formatDate(schedule.nextRun || schedule.next_run) }}</span>
             </div>
-            <div v-if="schedule.last_run" class="info-row">
+            <div v-if="schedule.lastRun || schedule.last_run" class="info-row">
               <span class="label">Last Run:</span>
-              <span class="value">{{ formatDate(schedule.last_run) }}</span>
+              <span class="value">{{ formatDate(schedule.lastRun || schedule.last_run) }}</span>
             </div>
           </div>
         </div>
@@ -115,9 +127,9 @@
             </div>
             <div class="form-group">
               <label>Playbook</label>
-              <select v-model="formData.playbook_id" required>
+              <select v-model="formData.playbookId" required>
                 <option value="">Select playbook</option>
-                <option v-for="p in playbooks" :key="p.id" :value="p.id">{{ p.name }}</option>
+                <option v-for="p in playbooksStore.playbooks" :key="p.id || p.name" :value="p.id || p.name">{{ p.name }}</option>
               </select>
             </div>
             <div class="form-row">
@@ -140,8 +152,8 @@
             <div class="form-group">
               <label>Target Nodes</label>
               <div class="node-selector">
-                <label v-for="node in nodes" :key="node.id" class="checkbox-label">
-                  <input type="checkbox" :value="node.id" v-model="formData.target_nodes" />
+                <label v-for="node in nodesStore.nodes" :key="node.id" class="checkbox-label">
+                  <input type="checkbox" :value="node.id" v-model="formData.targetNodes" />
                   {{ node.name }}
                 </label>
               </div>
@@ -156,7 +168,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="closeDialog">Cancel</button>
-          <button class="btn btn-primary" @click="saveSchedule">
+          <button class="btn btn-primary" @click="saveSchedule" :disabled="schedulesStore.loading">
             {{ editingSchedule ? 'Save' : 'Create' }}
           </button>
         </div>
@@ -166,112 +178,73 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useApi } from '@/composables/useApi'
+import { ref, onMounted } from 'vue'
+import { useSchedulesStore } from '@/stores/schedules'
+import { useNodesStore } from '@/stores/nodes'
+import { usePlaybooksStore } from '@/stores/playbooks'
 
-const { get, post, put, del } = useApi()
+const schedulesStore = useSchedulesStore()
+const nodesStore = useNodesStore()
+const playbooksStore = usePlaybooksStore()
 
-const schedules = ref([])
-const playbooks = ref([])
-const nodes = ref([])
-const loading = ref(false)
 const showCreateDialog = ref(false)
 const editingSchedule = ref(null)
 
 const formData = ref({
   name: '',
-  playbook_id: '',
+  playbookId: '',
   cron: '0 * * * *',
   timezone: 'UTC',
-  target_nodes: [],
+  targetNodes: [],
   enabled: true
 })
 
-const enabledCount = computed(() => schedules.value.filter(s => s.enabled).length)
-const disabledCount = computed(() => schedules.value.filter(s => !s.enabled).length)
-
-async function fetchSchedules() {
-  loading.value = true
-  try {
-    const res = await get('/schedules')
-    schedules.value = res.data?.items || []
-  } catch (e) {
-    console.error('Failed to fetch schedules:', e)
-    schedules.value = []
-  } finally {
-    loading.value = false
-  }
-}
-
-async function fetchPlaybooks() {
-  try {
-    const res = await get('/playbooks')
-    playbooks.value = res.data?.items || []
-  } catch (e) {
-    playbooks.value = []
-  }
-}
-
-async function fetchNodes() {
-  try {
-    const res = await get('/nodes')
-    nodes.value = res.data?.items || []
-  } catch (e) {
-    nodes.value = []
-  }
-}
-
 async function saveSchedule() {
-  try {
-    const payload = {
-      name: formData.value.name,
-      playbook_id: formData.value.playbook_id,
-      cron: formData.value.cron,
-      timezone: formData.value.timezone,
-      target_nodes: formData.value.target_nodes,
-      enabled: formData.value.enabled
-    }
+  const payload = {
+    name: formData.value.name,
+    playbookId: formData.value.playbookId,
+    cron: formData.value.cron,
+    timezone: formData.value.timezone,
+    targetNodes: formData.value.targetNodes,
+    enabled: formData.value.enabled
+  }
 
-    if (editingSchedule.value) {
-      await put(`/schedules/${editingSchedule.value.id}`, payload)
-    } else {
-      await post('/schedules', payload)
-    }
+  let result
+  if (editingSchedule.value) {
+    result = await schedulesStore.updateSchedule(editingSchedule.value.id, payload)
+  } else {
+    result = await schedulesStore.createSchedule(payload)
+  }
 
+  if (result.success) {
     closeDialog()
-    fetchSchedules()
-  } catch (e) {
-    alert('Failed to save schedule: ' + e.message)
+  } else {
+    alert(result.error || 'Failed to save schedule')
   }
 }
 
 async function toggleSchedule(schedule) {
-  try {
-    await post(`/schedules/${schedule.id}/toggle`)
-    fetchSchedules()
-  } catch (e) {
-    alert('Failed to toggle schedule')
+  const result = await schedulesStore.toggleSchedule(schedule.id)
+  if (!result.success) {
+    alert(result.error || 'Failed to toggle schedule')
   }
 }
 
 async function runSchedule(schedule) {
   if (!confirm(`Run "${schedule.name}" now?`)) return
-  try {
-    const res = await post(`/schedules/${schedule.id}/run`)
-    alert(`Task created: ${res.data?.task_id || 'OK'}`)
-    fetchSchedules()
-  } catch (e) {
-    alert('Failed to run schedule')
+  const result = await schedulesStore.runScheduleNow(schedule.id)
+  if (result.success) {
+    alert(`Task created: ${result.data?.taskId || 'OK'}`)
+  } else {
+    alert(result.error || 'Failed to run schedule')
   }
 }
 
 async function deleteSchedule(schedule) {
   if (!confirm(`Delete "${schedule.name}"?`)) return
-  try {
-    await del(`/schedules/${schedule.id}`)
-    fetchSchedules()
-  } catch (e) {
-    alert('Failed to delete schedule')
+  const result = await schedulesStore.deleteSchedule(schedule.id)
+  if (!result.success) {
+    alert(result.error || 'Failed to delete schedule')
   }
 }
 
@@ -279,10 +252,10 @@ function editSchedule(schedule) {
   editingSchedule.value = schedule
   formData.value = {
     name: schedule.name,
-    playbook_id: schedule.playbook_id,
+    playbookId: schedule.playbookId || schedule.playbook_id,
     cron: schedule.cron,
     timezone: schedule.timezone || 'UTC',
-    target_nodes: schedule.target_nodes || [],
+    targetNodes: schedule.targetNodes || schedule.target_nodes || [],
     enabled: schedule.enabled
   }
 }
@@ -292,10 +265,10 @@ function closeDialog() {
   editingSchedule.value = null
   formData.value = {
     name: '',
-    playbook_id: '',
+    playbookId: '',
     cron: '0 * * * *',
     timezone: 'UTC',
-    target_nodes: [],
+    targetNodes: [],
     enabled: true
   }
 }
@@ -316,7 +289,7 @@ function getCronDescription(cron) {
   if (parts[0] === '0' && parts[1] === '*') {
     return 'Hourly'
   }
-  if (parts[1] !== '*' && !parts[1].contains('/')) {
+  if (parts[1] !== '*' && !parts[1].includes('/')) {
     const hour = parseInt(parts[1])
     const minute = parseInt(parts[0])
     return `Daily at ${hour}:${minute.toString().padStart(2, '0')}`
@@ -324,10 +297,12 @@ function getCronDescription(cron) {
   return cron
 }
 
-onMounted(() => {
-  fetchSchedules()
-  fetchPlaybooks()
-  fetchNodes()
+onMounted(async () => {
+  await Promise.all([
+    schedulesStore.fetchSchedules(),
+    nodesStore.fetchNodes(),
+    playbooksStore.fetchPlaybooks()
+  ])
 })
 </script>
 
@@ -346,6 +321,7 @@ onMounted(() => {
 .page-header h1 {
   margin: 0;
   font-size: 24px;
+  color: white;
 }
 
 .header-actions {
@@ -361,7 +337,7 @@ onMounted(() => {
 }
 
 .stat-card {
-  background: var(--card-bg);
+  background: #1f2937;
   border-radius: 8px;
   padding: 16px;
   display: flex;
@@ -391,24 +367,56 @@ onMounted(() => {
 .stat-value {
   font-size: 24px;
   font-weight: 600;
+  color: white;
 }
 
 .stat-label {
-  color: var(--text-secondary);
+  color: #9ca3af;
   font-size: 14px;
 }
 
-.schedules-grid {
-  background: var(--card-bg);
-  border-radius: 8px;
-  padding: 16px;
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  color: #9ca3af;
 }
 
-.loading-state,
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #374151;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-message {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  padding: 16px;
+  border-radius: 8px;
+}
+
 .empty-state {
   text-align: center;
   padding: 40px;
-  color: var(--text-secondary);
+  color: #9ca3af;
+  background: #1f2937;
+  border-radius: 8px;
+}
+
+.schedules-grid {
+  background: #1f2937;
+  border-radius: 8px;
+  padding: 16px;
 }
 
 .schedule-cards {
@@ -418,8 +426,8 @@ onMounted(() => {
 }
 
 .schedule-card {
-  background: var(--bg);
-  border: 1px solid var(--border-color);
+  background: #111827;
+  border: 1px solid #374151;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -429,8 +437,8 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  background: var(--header-bg);
-  border-bottom: 1px solid var(--border-color);
+  background: #1f2937;
+  border-bottom: 1px solid #374151;
 }
 
 .schedule-name {
@@ -442,6 +450,7 @@ onMounted(() => {
 .schedule-name h3 {
   margin: 0;
   font-size: 16px;
+  color: white;
 }
 
 .status-badge {
@@ -477,7 +486,7 @@ onMounted(() => {
 }
 
 .btn-icon:hover {
-  background: var(--hover-bg);
+  background: #374151;
 }
 
 .btn-icon.danger:hover {
@@ -496,19 +505,24 @@ onMounted(() => {
 }
 
 .info-row .label {
-  color: var(--text-secondary);
+  color: #9ca3af;
   min-width: 100px;
 }
 
+.info-row .value {
+  color: #d1d5db;
+}
+
 .info-row code {
-  background: var(--code-bg);
+  background: #374151;
   padding: 2px 6px;
   border-radius: 3px;
   font-size: 12px;
+  color: #d1d5db;
 }
 
 .cron-desc {
-  color: var(--text-secondary);
+  color: #9ca3af;
   font-size: 12px;
   margin-left: 8px;
 }
@@ -524,15 +538,28 @@ onMounted(() => {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: #3b82f6;
   color: white;
   border: none;
 }
 
+.btn-primary:hover {
+  background: #2563eb;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .btn-secondary {
   background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border-color);
+  color: white;
+  border: 1px solid #374151;
+}
+
+.btn-secondary:hover {
+  background: #374151;
 }
 
 .modal-overlay {
@@ -546,7 +573,7 @@ onMounted(() => {
 }
 
 .modal {
-  background: var(--card-bg);
+  background: #1f2937;
   border-radius: 12px;
   width: 500px;
   max-height: 80vh;
@@ -558,12 +585,13 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid #374151;
 }
 
 .modal-header h2 {
   margin: 0;
   font-size: 18px;
+  color: white;
 }
 
 .close-btn {
@@ -571,7 +599,7 @@ onMounted(() => {
   border: none;
   font-size: 20px;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: #9ca3af;
 }
 
 .modal-body {
@@ -583,7 +611,7 @@ onMounted(() => {
   justify-content: flex-end;
   gap: 12px;
   padding: 16px 24px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid #374151;
 }
 
 .form-group {
@@ -594,6 +622,7 @@ onMounted(() => {
   display: block;
   margin-bottom: 6px;
   font-weight: 500;
+  color: #d1d5db;
 }
 
 .form-group input,
@@ -601,9 +630,9 @@ onMounted(() => {
   width: 100%;
   padding: 8px 12px;
   border-radius: 4px;
-  border: 1px solid var(--border-color);
-  background: var(--input-bg);
-  color: var(--text);
+  border: 1px solid #374151;
+  background: #111827;
+  color: white;
 }
 
 .form-row {
@@ -615,7 +644,7 @@ onMounted(() => {
 .node-selector {
   max-height: 150px;
   overflow-y: auto;
-  border: 1px solid var(--border-color);
+  border: 1px solid #374151;
   border-radius: 4px;
   padding: 8px;
 }
@@ -626,5 +655,6 @@ onMounted(() => {
   gap: 8px;
   padding: 4px 0;
   cursor: pointer;
+  color: #d1d5db;
 }
 </style>

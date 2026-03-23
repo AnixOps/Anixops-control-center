@@ -6,7 +6,7 @@
         <button class="btn btn-primary" @click="showCreateDialog = true">
           <span class="icon">➕</span> New Task
         </button>
-        <button class="btn btn-secondary" @click="fetchTasks">
+        <button class="btn btn-secondary" @click="tasksStore.fetchTasks()">
           <span class="icon">🔄</span> Refresh
         </button>
       </div>
@@ -17,28 +17,28 @@
       <div class="stat-card">
         <div class="stat-icon pending">⏳</div>
         <div class="stat-info">
-          <span class="stat-value">{{ stats.pending }}</span>
+          <span class="stat-value">{{ tasksStore.pendingCount }}</span>
           <span class="stat-label">Pending</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon running">🏃</div>
         <div class="stat-info">
-          <span class="stat-value">{{ stats.running }}</span>
+          <span class="stat-value">{{ tasksStore.runningCount }}</span>
           <span class="stat-label">Running</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon completed">✅</div>
         <div class="stat-info">
-          <span class="stat-value">{{ stats.completed }}</span>
+          <span class="stat-value">{{ tasksStore.completedCount }}</span>
           <span class="stat-label">Completed</span>
         </div>
       </div>
       <div class="stat-card">
         <div class="stat-icon failed">❌</div>
         <div class="stat-info">
-          <span class="stat-value">{{ stats.failed }}</span>
+          <span class="stat-value">{{ tasksStore.failedCount }}</span>
           <span class="stat-label">Failed</span>
         </div>
       </div>
@@ -48,7 +48,7 @@
     <div class="filters-bar">
       <div class="filter-group">
         <label>Status:</label>
-        <select v-model="statusFilter" @change="applyFilters">
+        <select v-model="tasksStore.statusFilter">
           <option value="">All</option>
           <option value="pending">Pending</option>
           <option value="running">Running</option>
@@ -59,18 +59,26 @@
       </div>
       <div class="filter-group">
         <label>Playbook:</label>
-        <select v-model="playbookFilter" @change="applyFilters">
+        <select v-model="playbookFilter">
           <option value="">All Playbooks</option>
-          <option v-for="p in playbooks" :key="p.id" :value="p.id">{{ p.name }}</option>
+          <option v-for="p in playbooksStore.playbooks" :key="p.id" :value="p.id">{{ p.name }}</option>
         </select>
-      </div>
-      <div class="search-group">
-        <input type="text" v-model="searchQuery" placeholder="Search tasks..." @input="applyFilters" />
       </div>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="tasksStore.loading" class="loading-container">
+      <div class="spinner"></div>
+      <span>Loading tasks...</span>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="tasksStore.error" class="error-message">
+      {{ tasksStore.error }}
+    </div>
+
     <!-- Tasks Table -->
-    <div class="table-container">
+    <div v-else class="table-container">
       <table class="data-table">
         <thead>
           <tr>
@@ -84,22 +92,19 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-if="loading">
-            <td colspan="7" class="loading-row">Loading...</td>
-          </tr>
-          <tr v-else-if="filteredTasks.length === 0">
+          <tr v-if="filteredTasks.length === 0">
             <td colspan="7" class="empty-row">No tasks found</td>
           </tr>
           <tr v-else v-for="task in filteredTasks" :key="task.id" @click="viewTask(task)">
-            <td><code>{{ task.id }}</code></td>
-            <td>{{ task.playbook_name }}</td>
+            <td><code>{{ task.taskId || task.id }}</code></td>
+            <td>{{ task.playbookName || task.playbook_name }}</td>
             <td>
               <span :class="['status-badge', task.status]">
                 {{ task.status }}
               </span>
             </td>
-            <td>{{ task.target_nodes?.length || 0 }} nodes</td>
-            <td>{{ formatDate(task.created_at) }}</td>
+            <td>{{ task.targetNodes?.length || task.target_nodes?.length || 0 }} nodes</td>
+            <td>{{ formatDate(task.createdAt || task.created_at) }}</td>
             <td>{{ formatDuration(task) }}</td>
             <td class="actions">
               <button v-if="task.status === 'running'" class="btn-icon danger" @click.stop="cancelTask(task)" title="Cancel">
@@ -128,16 +133,16 @@
           <form @submit.prevent="createTask">
             <div class="form-group">
               <label>Playbook</label>
-              <select v-model="newTask.playbook_id" required>
+              <select v-model="newTask.playbookId" required>
                 <option value="">Select playbook</option>
-                <option v-for="p in playbooks" :key="p.id" :value="p.id">{{ p.name }}</option>
+                <option v-for="p in playbooksStore.playbooks" :key="p.id || p.name" :value="p.id || p.name">{{ p.name }}</option>
               </select>
             </div>
             <div class="form-group">
               <label>Target Nodes</label>
               <div class="node-selector">
-                <label v-for="node in nodes" :key="node.id" class="checkbox-label">
-                  <input type="checkbox" :value="node.id" v-model="newTask.target_nodes" />
+                <label v-for="node in nodesStore.nodes" :key="node.id" class="checkbox-label">
+                  <input type="checkbox" :value="node.id" v-model="newTask.targetNodes" />
                   {{ node.name }}
                 </label>
               </div>
@@ -150,7 +155,7 @@
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" @click="showCreateDialog = false">Cancel</button>
-          <button class="btn btn-primary" @click="createTask">Create Task</button>
+          <button class="btn btn-primary" @click="createTask" :disabled="tasksStore.loading">Create Task</button>
         </div>
       </div>
     </div>
@@ -159,14 +164,14 @@
     <div v-if="selectedTask" class="modal-overlay" @click.self="selectedTask = null">
       <div class="modal modal-lg">
         <div class="modal-header">
-          <h2>Task #{{ selectedTask.id }}</h2>
+          <h2>Task #{{ selectedTask.taskId || selectedTask.id }}</h2>
           <button class="close-btn" @click="selectedTask = null">✕</button>
         </div>
         <div class="modal-body">
           <div class="detail-grid">
             <div class="detail-item">
               <label>Playbook:</label>
-              <span>{{ selectedTask.playbook_name }}</span>
+              <span>{{ selectedTask.playbookName || selectedTask.playbook_name }}</span>
             </div>
             <div class="detail-item">
               <label>Status:</label>
@@ -174,7 +179,7 @@
             </div>
             <div class="detail-item">
               <label>Created:</label>
-              <span>{{ formatDate(selectedTask.created_at) }}</span>
+              <span>{{ formatDate(selectedTask.createdAt || selectedTask.created_at) }}</span>
             </div>
             <div class="detail-item">
               <label>Duration:</label>
@@ -184,7 +189,7 @@
           <div class="logs-section">
             <h3>Execution Logs</h3>
             <div class="logs-container">
-              <pre>{{ selectedTask.logs || 'No logs available' }}</pre>
+              <pre>{{ logsText }}</pre>
             </div>
           </div>
         </div>
@@ -194,132 +199,79 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useApi } from '@/composables/useApi'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useTasksStore } from '@/stores/tasks'
+import { useNodesStore } from '@/stores/nodes'
+import { usePlaybooksStore } from '@/stores/playbooks'
+import { useAuthStore } from '@/stores/auth'
 
-const { get, post } = useApi()
+const tasksStore = useTasksStore()
+const nodesStore = useNodesStore()
+const playbooksStore = usePlaybooksStore()
+const authStore = useAuthStore()
 
-const tasks = ref([])
-const playbooks = ref([])
-const nodes = ref([])
-const loading = ref(false)
 const showCreateDialog = ref(false)
 const selectedTask = ref(null)
-const statusFilter = ref('')
 const playbookFilter = ref('')
-const searchQuery = ref('')
 
 const newTask = ref({
-  playbook_id: '',
-  target_nodes: [],
+  playbookId: '',
+  targetNodes: [],
   variables: ''
 })
 
-const stats = computed(() => ({
-  pending: tasks.value.filter(t => t.status === 'pending').length,
-  running: tasks.value.filter(t => t.status === 'running').length,
-  completed: tasks.value.filter(t => t.status === 'completed').length,
-  failed: tasks.value.filter(t => t.status === 'failed').length
-}))
-
 const filteredTasks = computed(() => {
-  let result = tasks.value
-  if (statusFilter.value) {
-    result = result.filter(t => t.status === statusFilter.value)
-  }
+  let result = tasksStore.filteredTasks
   if (playbookFilter.value) {
-    result = result.filter(t => t.playbook_id === playbookFilter.value)
-  }
-  if (searchQuery.value) {
-    const q = searchQuery.value.toLowerCase()
-    result = result.filter(t =>
-      t.playbook_name?.toLowerCase().includes(q) ||
-      t.id.toString().includes(q)
-    )
+    result = result.filter(t => t.playbookId === playbookFilter.value || t.playbook_id === playbookFilter.value)
   }
   return result
 })
 
-async function fetchTasks() {
-  loading.value = true
-  try {
-    const res = await get('/tasks')
-    tasks.value = res.data?.items || []
-  } catch (e) {
-    console.error('Failed to fetch tasks:', e)
-    tasks.value = []
-  } finally {
-    loading.value = false
+const logsText = computed(() => {
+  if (!selectedTask.value) return ''
+  if (tasksStore.taskLogs.length > 0) {
+    return tasksStore.taskLogs.map(l => l.message || l).join('\n')
   }
-}
-
-async function fetchPlaybooks() {
-  try {
-    const res = await get('/playbooks')
-    playbooks.value = res.data?.items || []
-  } catch (e) {
-    playbooks.value = []
-  }
-}
-
-async function fetchNodes() {
-  try {
-    const res = await get('/nodes')
-    nodes.value = res.data?.items || []
-  } catch (e) {
-    nodes.value = []
-  }
-}
+  return selectedTask.value.logs || 'No logs available'
+})
 
 async function createTask() {
-  try {
-    const payload = {
-      playbook_id: newTask.value.playbook_id,
-      target_nodes: newTask.value.target_nodes,
+  const payload = {
+    playbookId: newTask.value.playbookId,
+    targetNodes: newTask.value.targetNodes,
+  }
+  if (newTask.value.variables) {
+    try {
+      payload.variables = JSON.parse(newTask.value.variables)
+    } catch (e) {
+      alert('Invalid JSON in variables')
+      return
     }
-    if (newTask.value.variables) {
-      try {
-        payload.variables = JSON.parse(newTask.value.variables)
-      } catch (e) {
-        alert('Invalid JSON in variables')
-        return
-      }
-    }
-    await post('/tasks', payload)
+  }
+
+  const result = await tasksStore.createTask(payload)
+  if (result.success) {
     showCreateDialog.value = false
-    newTask.value = { playbook_id: '', target_nodes: [], variables: '' }
-    fetchTasks()
-  } catch (e) {
-    alert('Failed to create task: ' + e.message)
+    newTask.value = { playbookId: '', targetNodes: [], variables: '' }
+  } else {
+    alert(result.error || 'Failed to create task')
   }
 }
 
 async function cancelTask(task) {
   if (!confirm('Cancel this task?')) return
-  try {
-    await post(`/tasks/${task.id}/cancel`)
-    fetchTasks()
-  } catch (e) {
-    alert('Failed to cancel task')
-  }
+  await tasksStore.cancelTask(task.id || task.taskId)
 }
 
 async function retryTask(task) {
-  try {
-    await post(`/tasks/${task.id}/retry`)
-    fetchTasks()
-  } catch (e) {
-    alert('Failed to retry task')
-  }
+  await tasksStore.retryTask(task.id || task.taskId)
 }
 
 async function viewTask(task) {
-  try {
-    const res = await get(`/tasks/${task.id}`)
-    selectedTask.value = res.data
-  } catch (e) {
-    selectedTask.value = task
-  }
+  selectedTask.value = task
+  await tasksStore.fetchTask(task.id || task.taskId)
+  await tasksStore.fetchTaskLogs(task.id || task.taskId)
 }
 
 function formatDate(date) {
@@ -328,19 +280,28 @@ function formatDate(date) {
 }
 
 function formatDuration(task) {
-  if (!task.started_at) return '-'
-  const start = new Date(task.started_at)
-  const end = task.completed_at ? new Date(task.completed_at) : new Date()
+  const startedAt = task.startedAt || task.started_at
+  const completedAt = task.completedAt || task.completed_at
+  if (!startedAt) return '-'
+  const start = new Date(startedAt)
+  const end = completedAt ? new Date(completedAt) : new Date()
   const diff = Math.floor((end - start) / 1000)
   if (diff < 60) return `${diff}s`
   if (diff < 3600) return `${Math.floor(diff / 60)}m ${diff % 60}s`
   return `${Math.floor(diff / 3600)}h ${Math.floor((diff % 3600) / 60)}m`
 }
 
-onMounted(() => {
-  fetchTasks()
-  fetchPlaybooks()
-  fetchNodes()
+onMounted(async () => {
+  await Promise.all([
+    tasksStore.fetchTasks(),
+    nodesStore.fetchNodes(),
+    playbooksStore.fetchPlaybooks()
+  ])
+
+  // Subscribe to real-time updates
+  if (authStore.token) {
+    tasksStore.subscribeToUpdates(authStore.token)
+  }
 })
 </script>
 
@@ -359,6 +320,7 @@ onMounted(() => {
 .page-header h1 {
   margin: 0;
   font-size: 24px;
+  color: white;
 }
 
 .header-actions {
@@ -374,7 +336,7 @@ onMounted(() => {
 }
 
 .stat-card {
-  background: var(--card-bg);
+  background: #1f2937;
   border-radius: 8px;
   padding: 16px;
   display: flex;
@@ -405,10 +367,11 @@ onMounted(() => {
 .stat-value {
   font-size: 24px;
   font-weight: 600;
+  color: white;
 }
 
 .stat-label {
-  color: var(--text-secondary);
+  color: #9ca3af;
   font-size: 14px;
 }
 
@@ -417,7 +380,7 @@ onMounted(() => {
   gap: 16px;
   margin-bottom: 24px;
   padding: 16px;
-  background: var(--card-bg);
+  background: #1f2937;
   border-radius: 8px;
 }
 
@@ -428,29 +391,50 @@ onMounted(() => {
 }
 
 .filter-group label {
-  color: var(--text-secondary);
+  color: #9ca3af;
   font-size: 14px;
 }
 
 .filter-group select {
   padding: 8px 12px;
   border-radius: 4px;
-  border: 1px solid var(--border-color);
-  background: var(--input-bg);
-  color: var(--text);
+  border: 1px solid #374151;
+  background: #111827;
+  color: white;
 }
 
-.search-group input {
-  padding: 8px 12px;
-  border-radius: 4px;
-  border: 1px solid var(--border-color);
-  background: var(--input-bg);
-  color: var(--text);
-  width: 250px;
+.loading-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px;
+  color: #9ca3af;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #374151;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.error-message {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  padding: 16px;
+  border-radius: 8px;
 }
 
 .table-container {
-  background: var(--card-bg);
+  background: #1f2937;
   border-radius: 8px;
   overflow: hidden;
 }
@@ -464,17 +448,17 @@ onMounted(() => {
 .data-table td {
   padding: 12px 16px;
   text-align: left;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid #374151;
 }
 
 .data-table th {
-  background: var(--header-bg);
+  background: #111827;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: #9ca3af;
 }
 
 .data-table tbody tr:hover {
-  background: var(--hover-bg);
+  background: rgba(59, 130, 246, 0.1);
   cursor: pointer;
 }
 
@@ -516,21 +500,33 @@ onMounted(() => {
 }
 
 .btn-primary {
-  background: var(--primary);
+  background: #3b82f6;
   color: white;
   border: none;
 }
 
-.btn-secondary {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border-color);
+.btn-primary:hover {
+  background: #2563eb;
 }
 
-.loading-row,
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: white;
+  border: 1px solid #374151;
+}
+
+.btn-secondary:hover {
+  background: #374151;
+}
+
 .empty-row {
   text-align: center;
-  color: var(--text-secondary);
+  color: #9ca3af;
   padding: 40px;
 }
 
@@ -545,7 +541,7 @@ onMounted(() => {
 }
 
 .modal {
-  background: var(--card-bg);
+  background: #1f2937;
   border-radius: 12px;
   width: 500px;
   max-height: 80vh;
@@ -561,12 +557,13 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 16px 24px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid #374151;
 }
 
 .modal-header h2 {
   margin: 0;
   font-size: 18px;
+  color: white;
 }
 
 .close-btn {
@@ -574,7 +571,7 @@ onMounted(() => {
   border: none;
   font-size: 20px;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: #9ca3af;
 }
 
 .modal-body {
@@ -586,7 +583,7 @@ onMounted(() => {
   justify-content: flex-end;
   gap: 12px;
   padding: 16px 24px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid #374151;
 }
 
 .form-group {
@@ -597,6 +594,7 @@ onMounted(() => {
   display: block;
   margin-bottom: 6px;
   font-weight: 500;
+  color: #d1d5db;
 }
 
 .form-group select,
@@ -604,15 +602,15 @@ onMounted(() => {
   width: 100%;
   padding: 8px 12px;
   border-radius: 4px;
-  border: 1px solid var(--border-color);
-  background: var(--input-bg);
-  color: var(--text);
+  border: 1px solid #374151;
+  background: #111827;
+  color: white;
 }
 
 .node-selector {
   max-height: 150px;
   overflow-y: auto;
-  border: 1px solid var(--border-color);
+  border: 1px solid #374151;
   border-radius: 4px;
   padding: 8px;
 }
@@ -623,6 +621,7 @@ onMounted(() => {
   gap: 8px;
   padding: 4px 0;
   cursor: pointer;
+  color: #d1d5db;
 }
 
 .detail-grid {
@@ -639,18 +638,22 @@ onMounted(() => {
 }
 
 .detail-item label {
-  color: var(--text-secondary);
+  color: #9ca3af;
   font-size: 12px;
+}
+
+.detail-item span {
+  color: white;
 }
 
 .logs-section h3 {
   margin: 0 0 12px;
   font-size: 14px;
-  color: var(--text-secondary);
+  color: #9ca3af;
 }
 
 .logs-container {
-  background: #1e1e1e;
+  background: #111827;
   border-radius: 8px;
   padding: 16px;
   max-height: 300px;

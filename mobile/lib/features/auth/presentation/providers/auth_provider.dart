@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
 import 'package:anixops_mobile/core/services/api_client.dart';
+import 'package:anixops_mobile/core/services/sse_service.dart';
 import 'package:anixops_mobile/core/providers/api_providers.dart';
 
 class AuthState {
@@ -51,6 +52,7 @@ class AuthState {
 class AuthNotifier extends StateNotifier<AuthState> {
   final ApiClient _apiClient;
   final SharedPreferences _prefs;
+  final SSEService _sseService;
 
   static const String _tokenKey = 'auth_token';
   static const String _refreshTokenKey = 'refresh_token';
@@ -58,7 +60,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   static const String _emailKey = 'user_email';
   static const String _roleKey = 'user_role';
 
-  AuthNotifier(this._apiClient, this._prefs) : super(const AuthState()) {
+  AuthNotifier(this._apiClient, this._prefs, this._sseService) : super(const AuthState()) {
     _loadStoredAuth();
   }
 
@@ -74,6 +76,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: _prefs.getString(_emailKey),
         role: _prefs.getString(_roleKey),
       );
+      // Connect SSE with stored token
+      _connectSSE(token);
     }
   }
 
@@ -98,6 +102,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
         // Set auth header
         _apiClient.setAuthToken(token);
+
+        // Connect SSE
+        _connectSSE(token);
 
         state = AuthState(
           isAuthenticated: true,
@@ -127,7 +134,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  void _connectSSE(String token) {
+    _sseService.connect(SSEConfig.defaultUrl, token: token).then((_) {
+      // Subscribe to default channels
+      for (final channel in SSEConfig.defaultChannels) {
+        _sseService.subscribe(channel);
+      }
+    });
+  }
+
   Future<void> logout() async {
+    // Disconnect SSE first
+    _sseService.disconnect();
+
     try {
       await _apiClient.auth.logout();
     } catch (_) {
@@ -218,5 +237,6 @@ final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
 final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
   final apiClient = ref.watch(apiClientProvider);
   final prefs = ref.watch(sharedPreferencesProvider);
-  return AuthNotifier(apiClient, prefs);
+  final sse = ref.watch(sseServiceProvider);
+  return AuthNotifier(apiClient, prefs, sse);
 });
