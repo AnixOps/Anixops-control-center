@@ -181,7 +181,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import {
   ServerIcon,
   EyeIcon,
@@ -206,10 +206,13 @@ const formData = ref({
 onMounted(async () => {
   await nodesStore.fetchNodes()
 
-  // Subscribe to real-time updates
   if (authStore.token) {
-    nodesStore.subscribeToUpdates(authStore.token)
+    await nodesStore.subscribeToUpdates(authStore.token)
   }
+})
+
+onUnmounted(() => {
+  nodesStore.unsubscribeFromUpdates()
 })
 
 function formatTraffic(bytes) {

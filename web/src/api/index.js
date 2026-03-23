@@ -124,6 +124,6 @@ export const ipfsApi = {
 // Web3 Services
 export const web3Api = {
   challenge: (address) => api.post('/web3/challenge', { address }),
-  verify: (address, signature) => api.post('/web3/verify', { address, signature }),
+  verify: (address, signature, message) => api.post('/web3/verify', { address, signature, message }),
   audit: (auditData) => api.post('/web3/audit', auditData)
 }

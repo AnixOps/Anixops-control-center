@@ -54,6 +54,7 @@ yarn-error.log*
 
 # Web build
 web/dist/
+web/playwright-report/
 
 # Config secrets
 configs/config.prod.yaml

@@ -199,7 +199,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useTasksStore } from '@/stores/tasks'
 import { useNodesStore } from '@/stores/nodes'
 import { usePlaybooksStore } from '@/stores/playbooks'
@@ -298,10 +298,13 @@ onMounted(async () => {
     playbooksStore.fetchPlaybooks()
   ])
 
-  // Subscribe to real-time updates
   if (authStore.token) {
-    tasksStore.subscribeToUpdates(authStore.token)
+    await tasksStore.subscribeToUpdates(authStore.token)
   }
+})
+
+onUnmounted(() => {
+  tasksStore.unsubscribeFromUpdates()
 })
 </script>
 

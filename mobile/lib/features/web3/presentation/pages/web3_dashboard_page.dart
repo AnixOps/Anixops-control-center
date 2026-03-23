@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/services/api_client.dart';
+import 'package:anixops_mobile/core/services/api_client.dart';
 
 /// Wallet connection state
 final walletAddressProvider = StateProvider<String?>((ref) => null);
@@ -144,8 +144,16 @@ class _Web3DashboardPageState extends ConsumerState<Web3DashboardPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Web3 Dashboard'),
-        subtitle: const Text('IPFS & Blockchain Integration'),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Web3 Dashboard'),
+            Text(
+              'IPFS & Blockchain Integration',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+            ),
+          ],
+        ),
         actions: [
           if (walletAddress != null)
             Container(

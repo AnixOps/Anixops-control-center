@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/services/tasks_api.dart';
 import '../../../../core/providers/api_providers.dart';
@@ -65,9 +66,80 @@ class TasksState {
 /// Tasks notifier
 class TasksNotifier extends StateNotifier<TasksState> {
   final TasksApi _api;
+  final Ref _ref;
+  StreamSubscription<bool>? _connectionSubscription;
 
-  TasksNotifier(this._api) : super(const TasksState()) {
+  TasksNotifier(this._api, this._ref) : super(const TasksState()) {
+    _bindRealtimeUpdates();
     loadTasks();
+  }
+
+  void _bindRealtimeUpdates() {
+    final sse = _ref.read(sseServiceProvider);
+
+    sse.on('task_update', _handleTaskUpdate);
+    sse.on('log', _handleTaskLog);
+    _connectionSubscription = sse.connectionState.listen((connected) {
+      if (!connected) return;
+      if (!sse.subscribedChannels.contains('tasks')) {
+        unawaited(sse.subscribe('tasks'));
+      }
+      if (!sse.subscribedChannels.contains('logs')) {
+        unawaited(sse.subscribe('logs'));
+      }
+    });
+  }
+
+  void _handleTaskUpdate(dynamic payload) {
+    if (payload is! Map) return;
+
+    final taskId = payload['task_id']?.toString();
+    if (taskId == null || taskId.isEmpty) return;
+
+    final updatedTasks = state.tasks.map((task) {
+      if (task.taskId != taskId) return task;
+
+      return Task(
+        taskId: task.taskId,
+        playbookId: task.playbookId,
+        playbookName: task.playbookName,
+        status: payload['status']?.toString() ?? task.status,
+        triggerType: task.triggerType,
+        triggeredBy: task.triggeredBy,
+        triggeredByEmail: task.triggeredByEmail,
+        targetNodes: task.targetNodes,
+        variables: task.variables,
+        result: payload['result'] is Map<String, dynamic>
+            ? payload['result'] as Map<String, dynamic>
+            : task.result,
+        error: payload['error']?.toString() ?? task.error,
+        createdAt: task.createdAt,
+        startedAt: task.startedAt,
+        completedAt: task.completedAt,
+        category: task.category,
+      );
+    }).toList();
+
+    Task? updatedSelectedTask = state.selectedTask;
+    if (updatedSelectedTask?.taskId == taskId) {
+      updatedSelectedTask = updatedTasks.firstWhere(
+        (task) => task.taskId == taskId,
+        orElse: () => updatedSelectedTask!,
+      );
+    }
+
+    state = state.copyWith(tasks: updatedTasks, selectedTask: updatedSelectedTask);
+  }
+
+  void _handleTaskLog(dynamic payload) {
+    if (payload is! Map) return;
+
+    final taskId = payload['task_id']?.toString();
+    if (taskId == null || taskId.isEmpty) return;
+    if (state.selectedTask?.taskId != taskId) return;
+
+    final log = TaskLog.fromJson(Map<String, dynamic>.from(payload));
+    state = state.copyWith(taskLogs: [...state.taskLogs, log]);
   }
 
   /// Load tasks
@@ -189,14 +261,18 @@ class TasksNotifier extends StateNotifier<TasksState> {
     );
   }
 
-  /// Clear error
-  void clearError() {
-    state = state.copyWith(error: null);
+  @override
+  void dispose() {
+    final sse = _ref.read(sseServiceProvider);
+    sse.off('task_update', _handleTaskUpdate);
+    sse.off('log', _handleTaskLog);
+    _connectionSubscription?.cancel();
+    super.dispose();
   }
 }
 
 /// Provider for TasksState
 final tasksProvider = StateNotifierProvider<TasksNotifier, TasksState>((ref) {
   final client = ref.watch(apiClientProvider);
-  return TasksNotifier(client.tasks);
+  return TasksNotifier(client.tasks, ref);
 });

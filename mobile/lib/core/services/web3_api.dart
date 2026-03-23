@@ -15,10 +15,11 @@ class Web3Api {
   }
 
   /// Verify wallet signature
-  Future<Map<String, dynamic>> verifySignature(String address, String signature) async {
+  Future<Map<String, dynamic>> verifySignature(String address, String signature, String message) async {
     final response = await _dio.post('/web3/verify', data: {
       'address': address,
       'signature': signature,
+      'message': message,
     });
     return response.data;
   }

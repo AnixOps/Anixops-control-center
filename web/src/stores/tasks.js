@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import api from '@/api'
 import { useSSE, SSEEventTypes, SSEChannels } from '@/composables/useSSE'
 
+const SSE_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
+
 export const useTasksStore = defineStore('tasks', () => {
   const tasks = ref([])
   const currentTask = ref(null)
@@ -36,7 +38,24 @@ export const useTasksStore = defineStore('tasks', () => {
   )
 
   // SSE connection
-  const { on: onSSE, subscribe } = useSSE()
+  const {
+    connected: sseConnected,
+    connect: connectSSE,
+    disconnect: disconnectSSE,
+    on: onSSE,
+    off: offSSE,
+    subscribe
+  } = useSSE()
+
+  const taskUpdateHandler = (data) => {
+    updateTaskFromSSE(data)
+  }
+
+  const logHandler = (data) => {
+    addLogFromSSE(data)
+  }
+
+  let subscribedToken = null
 
   // Fetch all tasks
   async function fetchTasks(params = {}) {
@@ -162,21 +181,29 @@ export const useTasksStore = defineStore('tasks', () => {
   }
 
   // Subscribe to real-time updates
-  function subscribeToUpdates(token) {
+  async function subscribeToUpdates(token) {
     if (!token) return
 
-    // Subscribe to tasks channel
-    subscribe(SSEChannels.TASKS, token)
+    if (subscribedToken === token && sseConnected.value) {
+      return
+    }
 
-    // Listen for task updates
-    onSSE(SSEEventTypes.TASK_UPDATE, (data) => {
-      updateTaskFromSSE(data)
-    })
+    connectSSE(`${SSE_BASE_URL}/sse`, token)
 
-    // Listen for log events
-    onSSE(SSEEventTypes.LOG, (data) => {
-      addLogFromSSE(data)
-    })
+    offSSE(SSEEventTypes.TASK_UPDATE, taskUpdateHandler)
+    offSSE(SSEEventTypes.LOG, logHandler)
+    onSSE(SSEEventTypes.TASK_UPDATE, taskUpdateHandler)
+    onSSE(SSEEventTypes.LOG, logHandler)
+
+    await subscribe(SSEChannels.TASKS, token, SSE_BASE_URL)
+    await subscribe(SSEChannels.LOGS, token, SSE_BASE_URL)
+    subscribedToken = token
+  }
+
+  function unsubscribeFromUpdates() {
+    offSSE(SSEEventTypes.TASK_UPDATE, taskUpdateHandler)
+    offSSE(SSEEventTypes.LOG, logHandler)
+    subscribedToken = null
   }
 
   return {
@@ -187,6 +214,7 @@ export const useTasksStore = defineStore('tasks', () => {
     loading,
     error,
     statusFilter,
+    sseConnected,
 
     // Computed
     filteredTasks,
@@ -203,6 +231,7 @@ export const useTasksStore = defineStore('tasks', () => {
     retryTask,
     fetchTaskLogs,
     subscribeToUpdates,
+    unsubscribeFromUpdates,
     updateTaskFromSSE,
     addLogFromSSE
   }

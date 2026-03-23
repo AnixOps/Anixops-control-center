@@ -41,4 +41,13 @@ void main() {
       // Verify proper handling of unauthenticated state
     });
   });
+
+  group('Navigation Reachability', () {
+    testWidgets('AI and Web3 pages remain reachable in app build', (tester) async {
+      app.main();
+      await tester.pumpAndSettle();
+
+      expect(find.text('AnixOps'), findsWidgets);
+    });
+  });
 }

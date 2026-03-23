@@ -1,16 +1,22 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 /// SSE Service for real-time communication with Workers API
 /// Uses Server-Sent Events instead of WebSocket due to Cloudflare Durable Object issues
 class SSEService {
-  http.Client? _client;
+  SSEService({http.Client Function()? clientFactory})
+      : _clientFactory = clientFactory ?? http.Client.new;
+
+  final http.Client Function() _clientFactory;
+  http.Client? _streamClient;
   final Map<String, List<Function(dynamic)>> _handlers = {};
   Timer? _reconnectTimer;
   String? _url;
   String? _token;
   bool _isConnecting = false;
+  bool _isConnected = false;
   bool _shouldReconnect = true;
   int _reconnectAttempts = 0;
   static const int _maxReconnectAttempts = 10;
@@ -18,7 +24,7 @@ class SSEService {
   static const Duration _maxReconnectDelay = Duration(seconds: 30);
 
   /// Whether the SSE is connected
-  bool get isConnected => _client != null && !_isConnecting;
+  bool get isConnected => _isConnected;
 
   /// Stream of connection state changes
   final StreamController<bool> _connectionStateController =
@@ -31,7 +37,12 @@ class SSEService {
 
   /// Connect to SSE endpoint
   Future<void> connect(String url, {String? token}) async {
-    if (_isConnecting || isConnected) return;
+    if (_isConnecting) return;
+    if (_isConnected && _url == url && _token == token) return;
+
+    _reconnectTimer?.cancel();
+    _streamClient?.close();
+    _streamClient = null;
 
     _url = url;
     _token = token;
@@ -39,7 +50,8 @@ class SSEService {
     _shouldReconnect = true;
 
     try {
-      _client = http.Client();
+      final client = _clientFactory();
+      _streamClient = client;
 
       final request = http.Request('GET', Uri.parse(url));
       request.headers['Accept'] = 'text/event-stream';
@@ -48,19 +60,19 @@ class SSEService {
         request.headers['Authorization'] = 'Bearer $token';
       }
 
-      final response = await _client!.send(request);
+      final response = await client.send(request);
 
       if (response.statusCode != 200) {
         throw Exception('SSE connection failed: ${response.statusCode}');
       }
 
       _isConnecting = false;
+      _isConnected = true;
       _reconnectAttempts = 0;
       _connectionStateController.add(true);
 
-      // Listen to the stream
       final stream = response.stream.transform(utf8.decoder);
-      String buffer = '';
+      var buffer = '';
 
       await for (final chunk in stream) {
         if (!_shouldReconnect) break;
@@ -69,24 +81,22 @@ class SSEService {
         _processBuffer(buffer);
         buffer = _clearProcessedEvents(buffer);
       }
-    } catch (e) {
-      _isConnecting = false;
-      _client?.close();
-      _client = null;
-      _connectionStateController.add(false);
 
       if (_shouldReconnect) {
-        _scheduleReconnect();
+        _handleDisconnect(scheduleReconnect: true);
       }
+    } catch (_) {
+      _handleDisconnect(scheduleReconnect: _shouldReconnect);
+    } finally {
+      _isConnecting = false;
     }
   }
 
   /// Process the buffer for complete events
   void _processBuffer(String buffer) {
-    // Split by double newlines (event separator)
     final events = buffer.split('\n\n');
 
-    for (int i = 0; i < events.length - 1; i++) {
+    for (var i = 0; i < events.length - 1; i++) {
       final event = events[i].trim();
       if (event.isNotEmpty) {
         _parseAndDispatchEvent(event);
@@ -107,84 +117,74 @@ class SSEService {
   void _parseAndDispatchEvent(String eventText) {
     String? eventType;
     String? data;
-    String? id;
 
     for (final line in eventText.split('\n')) {
       if (line.startsWith('event:')) {
         eventType = line.substring(6).trim();
       } else if (line.startsWith('data:')) {
         data = line.substring(5).trim();
-      } else if (line.startsWith('id:')) {
-        id = line.substring(3).trim();
       } else if (line.startsWith(':')) {
         // Comment line (heartbeat), ignore
       }
     }
 
-    // Handle heartbeat
     if (eventText.contains(': heartbeat')) {
       return;
     }
 
-    // Parse data as JSON if present
     dynamic parsedData;
     if (data != null && data.isNotEmpty) {
       try {
         parsedData = jsonDecode(data);
-      } catch (e) {
+      } catch (_) {
         parsedData = data;
       }
     }
 
-    // Dispatch to handlers
     if (eventType != null && _handlers.containsKey(eventType)) {
-      for (final handler in List.from(_handlers[eventType]!)) {
+      for (final handler in List<Function(dynamic)>.from(_handlers[eventType]!)) {
         try {
           handler(parsedData);
-        } catch (e) {
-          // Handler error, continue
-        }
+        } catch (_) {}
       }
     }
 
-    // Also dispatch to generic 'message' handlers if no specific event type
-    if (eventType == null && _handlers.containsKey('message')) {
-      for (final handler in List.from(_handlers['message']!)) {
-        try {
-          handler(parsedData);
-        } catch (e) {
-          // Handler error, continue
-        }
-      }
-    }
-
-    // Dispatch by type field in data (Workers API format)
     if (parsedData is Map && parsedData.containsKey('type')) {
       final type = parsedData['type'] as String;
       if (_handlers.containsKey(type)) {
-        for (final handler in List.from(_handlers[type]!)) {
+        for (final handler in List<Function(dynamic)>.from(_handlers[type]!)) {
           try {
             handler(parsedData['payload'] ?? parsedData);
-          } catch (e) {
-            // Handler error, continue
-          }
+          } catch (_) {}
         }
       }
     }
+
+    if (_handlers.containsKey('message')) {
+      for (final handler in List<Function(dynamic)>.from(_handlers['message']!)) {
+        try {
+          handler(parsedData);
+        } catch (_) {}
+      }
+    }
+  }
+
+  Uri _buildChannelUri(String action) {
+    final sseUri = Uri.parse(_url!);
+    final basePath = sseUri.path.endsWith('/sse')
+        ? sseUri.path.substring(0, sseUri.path.length - 4)
+        : sseUri.path;
+    return sseUri.replace(path: '$basePath/sse/$action', query: null);
   }
 
   /// Subscribe to a channel via REST API
   Future<bool> subscribe(String channel) async {
     if (_url == null || _token == null) return false;
 
+    final client = _clientFactory();
     try {
-      // Extract base URL from SSE URL
-      final baseUri = Uri.parse(_url!);
-      final baseUrl = '${baseUri.scheme}://${baseUri.host}';
-      final subscribeUrl = '$baseUrl/api/v1/sse/subscribe';
-
-      final response = await http.post(
-        Uri.parse(subscribeUrl),
+      final response = await client.post(
+        _buildChannelUri('subscribe'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $_token',
@@ -196,8 +196,10 @@ class SSEService {
         _subscribedChannels.add(channel);
         return true;
       }
-    } catch (e) {
+    } catch (_) {
       // Subscribe failed
+    } finally {
+      client.close();
     }
     return false;
   }
@@ -206,13 +208,10 @@ class SSEService {
   Future<bool> unsubscribe(String channel) async {
     if (_url == null || _token == null) return false;
 
+    final client = _clientFactory();
     try {
-      final baseUri = Uri.parse(_url!);
-      final baseUrl = '${baseUri.scheme}://${baseUri.host}';
-      final unsubscribeUrl = '$baseUrl/api/v1/sse/unsubscribe';
-
-      final response = await http.post(
-        Uri.parse(unsubscribeUrl),
+      final response = await client.post(
+        _buildChannelUri('unsubscribe'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $_token',
@@ -224,23 +223,55 @@ class SSEService {
         _subscribedChannels.remove(channel);
         return true;
       }
-    } catch (e) {
+    } catch (_) {
       // Unsubscribe failed
+    } finally {
+      client.close();
     }
     return false;
   }
 
+  @visibleForTesting
+  void parseTestEvent(String rawEvent) {
+    _parseAndDispatchEvent(rawEvent);
+  }
+
   /// Register a handler for an event type
   void on(String eventType, Function(dynamic) handler) {
-    _handlers.putIfAbsent(eventType, () => []).add(handler);
+    final handlers = _handlers.putIfAbsent(eventType, () => []);
+    if (!handlers.contains(handler)) {
+      handlers.add(handler);
+    }
   }
 
   /// Remove a handler for an event type
   void off(String eventType, [Function(dynamic)? handler]) {
     if (handler == null) {
       _handlers.remove(eventType);
-    } else {
-      _handlers[eventType]?.remove(handler);
+      return;
+    }
+
+    final handlers = _handlers[eventType];
+    handlers?.remove(handler);
+    if (handlers != null && handlers.isEmpty) {
+      _handlers.remove(eventType);
+    }
+  }
+
+  void _handleDisconnect({required bool scheduleReconnect}) {
+    _streamClient?.close();
+    _streamClient = null;
+
+    final wasConnected = _isConnected;
+    _isConnected = false;
+    _isConnecting = false;
+
+    if (wasConnected || scheduleReconnect) {
+      _connectionStateController.add(false);
+    }
+
+    if (scheduleReconnect && _shouldReconnect) {
+      _scheduleReconnect();
     }
   }
 
@@ -248,8 +279,10 @@ class SSEService {
   void disconnect() {
     _shouldReconnect = false;
     _reconnectTimer?.cancel();
-    _client?.close();
-    _client = null;
+    _streamClient?.close();
+    _streamClient = null;
+    _isConnected = false;
+    _isConnecting = false;
     _subscribedChannels.clear();
     _connectionStateController.add(false);
   }
@@ -260,18 +293,19 @@ class SSEService {
 
     _reconnectTimer?.cancel();
 
-    // Exponential backoff
     final delay = Duration(
       milliseconds: (_baseReconnectDelay.inMilliseconds *
               (1 << _reconnectAttempts.clamp(0, 5)))
-          .clamp(_baseReconnectDelay.inMilliseconds,
-              _maxReconnectDelay.inMilliseconds),
+          .clamp(
+            _baseReconnectDelay.inMilliseconds,
+            _maxReconnectDelay.inMilliseconds,
+          ),
     );
 
     _reconnectTimer = Timer(delay, () {
       _reconnectAttempts++;
       if (_url != null) {
-        connect(_url!, token: _token);
+        unawaited(connect(_url!, token: _token));
       }
     });
   }
@@ -284,6 +318,7 @@ class SSEService {
   /// Dispose resources
   void dispose() {
     disconnect();
+    _handlers.clear();
     _connectionStateController.close();
   }
 }

@@ -1,29 +1,41 @@
-import { ref, onUnmounted } from 'vue'
+import { ref, onUnmounted, getCurrentInstance } from 'vue'
+
+const eventSource = ref(null)
+const connected = ref(false)
+const error = ref(null)
+const handlers = new Map()
+
+let reconnectTimer = null
+let reconnectAttempts = 0
+let currentConnectionKey = null
+
+const maxReconnectAttempts = 10
+const baseReconnectDelay = 1000
+const maxReconnectDelay = 30000
+
+function buildConnectionKey(url, token) {
+  return `${url}::${token || ''}`
+}
 
 /**
  * SSE (Server-Sent Events) composable for real-time communication
  * with the Workers API
  */
 export function useSSE() {
-  const eventSource = ref(null)
-  const connected = ref(false)
-  const error = ref(null)
-  const handlers = new Map()
-
-  let reconnectTimer = null
-  let reconnectAttempts = 0
-  const maxReconnectAttempts = 10
-  const baseReconnectDelay = 1000
-  const maxReconnectDelay = 30000
-
   /**
    * Connect to SSE endpoint
    * @param {string} url - SSE endpoint URL
    * @param {string} token - Bearer token for authentication
    */
   function connect(url, token) {
+    const connectionKey = buildConnectionKey(url, token)
+
+    if (eventSource.value && currentConnectionKey === connectionKey) {
+      return
+    }
+
     if (eventSource.value) {
-      disconnect()
+      disconnect({ clearHandlers: false })
     }
 
     // EventSource doesn't support headers, so we need to pass token in URL
@@ -31,19 +43,18 @@ export function useSSE() {
 
     try {
       eventSource.value = new EventSource(urlWithToken)
+      currentConnectionKey = connectionKey
       error.value = null
 
       eventSource.value.onopen = () => {
         connected.value = true
         reconnectAttempts = 0
-        console.log('SSE connected')
       }
 
-      eventSource.value.onerror = (e) => {
+      eventSource.value.onerror = () => {
         connected.value = false
         error.value = 'Connection error'
 
-        // Attempt reconnection
         if (reconnectAttempts < maxReconnectAttempts) {
           scheduleReconnect(url, token)
         }
@@ -72,7 +83,7 @@ export function useSSE() {
 
       // Also dispatch to 'message' handlers
       dispatch('message', data)
-    } catch (e) {
+    } catch {
       // Plain text message
       dispatch('message', event.data)
     }
@@ -107,8 +118,6 @@ export function useSSE() {
       maxReconnectDelay
     )
 
-    console.log(`SSE reconnecting in ${delay}ms (attempt ${reconnectAttempts})`)
-
     reconnectTimer = setTimeout(() => {
       connect(url, token)
     }, delay)
@@ -117,7 +126,9 @@ export function useSSE() {
   /**
    * Disconnect from SSE endpoint
    */
-  function disconnect() {
+  function disconnect(options = {}) {
+    const { clearHandlers = false } = options
+
     if (reconnectTimer) {
       clearTimeout(reconnectTimer)
       reconnectTimer = null
@@ -129,7 +140,11 @@ export function useSSE() {
     }
 
     connected.value = false
-    handlers.clear()
+    currentConnectionKey = null
+
+    if (clearHandlers) {
+      handlers.clear()
+    }
   }
 
   /**
@@ -141,7 +156,11 @@ export function useSSE() {
     if (!handlers.has(eventType)) {
       handlers.set(eventType, [])
     }
-    handlers.get(eventType).push(handler)
+
+    const eventHandlers = handlers.get(eventType)
+    if (!eventHandlers.includes(handler)) {
+      eventHandlers.push(handler)
+    }
   }
 
   /**
@@ -207,10 +226,11 @@ export function useSSE() {
     }
   }
 
-  // Cleanup on unmount
-  onUnmounted(() => {
-    disconnect()
-  })
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      disconnect()
+    })
+  }
 
   return {
     connected,

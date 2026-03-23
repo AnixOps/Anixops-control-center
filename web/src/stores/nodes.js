@@ -3,6 +3,8 @@ import { ref, computed } from 'vue'
 import api from '@/api'
 import { useSSE, SSEEventTypes, SSEChannels } from '@/composables/useSSE'
 
+const SSE_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1'
+
 export const useNodesStore = defineStore('nodes', () => {
   const nodes = ref([])
   const loading = ref(false)
@@ -31,7 +33,20 @@ export const useNodesStore = defineStore('nodes', () => {
   )
 
   // SSE connection for real-time updates
-  const { connected: sseConnected, on: onSSE, subscribe } = useSSE()
+  const {
+    connected: sseConnected,
+    connect: connectSSE,
+    disconnect: disconnectSSE,
+    on: onSSE,
+    off: offSSE,
+    subscribe
+  } = useSSE()
+
+  const nodeUpdateHandler = (data) => {
+    updateNodeFromSSE(data)
+  }
+
+  let subscribedToken = null
 
   // Fetch all nodes
   async function fetchNodes(params = {}) {
@@ -188,16 +203,25 @@ export const useNodesStore = defineStore('nodes', () => {
   }
 
   // Subscribe to real-time updates
-  function subscribeToUpdates(token) {
+  async function subscribeToUpdates(token) {
     if (!token) return
 
-    // Subscribe to nodes channel
-    subscribe(SSEChannels.NODES, token)
+    if (subscribedToken === token && sseConnected.value) {
+      return
+    }
 
-    // Listen for node updates
-    onSSE(SSEEventTypes.NODE_UPDATE, (data) => {
-      updateNodeFromSSE(data)
-    })
+    connectSSE(`${SSE_BASE_URL}/sse`, token)
+
+    offSSE(SSEEventTypes.NODE_UPDATE, nodeUpdateHandler)
+    onSSE(SSEEventTypes.NODE_UPDATE, nodeUpdateHandler)
+
+    await subscribe(SSEChannels.NODES, token, SSE_BASE_URL)
+    subscribedToken = token
+  }
+
+  function unsubscribeFromUpdates() {
+    offSSE(SSEEventTypes.NODE_UPDATE, nodeUpdateHandler)
+    subscribedToken = null
   }
 
   return {
@@ -226,6 +250,7 @@ export const useNodesStore = defineStore('nodes', () => {
     restartNode,
     testNodeConnection,
     subscribeToUpdates,
+    unsubscribeFromUpdates,
     updateNodeFromSSE
   }
 })

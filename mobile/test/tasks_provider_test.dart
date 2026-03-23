@@ -197,4 +197,57 @@ void main() {
       expect(newState.tasks, isEmpty);
     });
   });
+
+  group('RC3 realtime helpers', () {
+    test('task update can merge status for existing task', () {
+      final original = Task(
+        taskId: 'task-123',
+        playbookName: 'deploy',
+        status: 'pending',
+        triggerType: 'manual',
+      );
+
+      final updated = Task(
+        taskId: original.taskId,
+        playbookId: original.playbookId,
+        playbookName: original.playbookName,
+        status: 'running',
+        triggerType: original.triggerType,
+        triggeredBy: original.triggeredBy,
+        triggeredByEmail: original.triggeredByEmail,
+        targetNodes: original.targetNodes,
+        variables: original.variables,
+        result: original.result,
+        error: original.error,
+        createdAt: original.createdAt,
+        startedAt: original.startedAt,
+        completedAt: original.completedAt,
+        category: original.category,
+      );
+
+      expect(updated.taskId, 'task-123');
+      expect(updated.status, 'running');
+      expect(updated.playbookName, 'deploy');
+    });
+
+    test('task logs can append for selected task', () {
+      final state = TasksState(
+        selectedTask: Task(taskId: 'task-123', status: 'running', triggerType: 'manual'),
+        taskLogs: const [],
+      );
+
+      final nextLogs = [
+        ...state.taskLogs,
+        TaskLog.fromJson({
+          'task_id': 'task-123',
+          'message': 'playbook step started',
+          'level': 'info',
+        }),
+      ];
+
+      expect(nextLogs.length, 1);
+      expect(nextLogs.first.taskId, 'task-123');
+      expect(nextLogs.first.message, 'playbook step started');
+    });
+  });
 }

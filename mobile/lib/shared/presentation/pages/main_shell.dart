@@ -52,6 +52,16 @@ class MainShell extends ConsumerWidget {
         label: 'Tasks',
       ),
       const NavigationDestination(
+        icon: Icon(Icons.auto_awesome_outlined),
+        selectedIcon: Icon(Icons.auto_awesome),
+        label: 'AI',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.webhook_outlined),
+        selectedIcon: Icon(Icons.webhook),
+        label: 'Web3',
+      ),
+      const NavigationDestination(
         icon: Icon(Icons.more_horiz),
         selectedIcon: Icon(Icons.more_horiz),
         label: 'More',
@@ -64,17 +74,19 @@ class MainShell extends ConsumerWidget {
     if (path.startsWith('/nodes')) return 1;
     if (path.startsWith('/playbooks')) return 2;
     if (path.startsWith('/tasks')) return 3;
+    if (path.startsWith('/ai')) return 4;
+    if (path.startsWith('/web3')) return 5;
     if (path.startsWith('/schedules') ||
         path.startsWith('/plugins') ||
         path.startsWith('/users') ||
         path.startsWith('/logs') ||
         path.startsWith('/settings') ||
-        path.startsWith('/notifications')) return 4;
+        path.startsWith('/notifications')) return 6;
     return 0;
   }
 
   void _onItemTapped(int index, BuildContext context) {
-    final routes = ['/dashboard', '/nodes', '/playbooks', '/tasks'];
+    final routes = ['/dashboard', '/nodes', '/playbooks', '/tasks', '/ai', '/web3'];
     if (index < routes.length) {
       context.go(routes[index]);
     } else {

@@ -92,7 +92,11 @@ export const useWeb3Store = defineStore('web3', () => {
     }
 
     try {
-      const response = await web3Api.verify(walletAddress.value, signature.value)
+      const response = await web3Api.verify(
+        walletAddress.value,
+        signature.value,
+        challenge.value?.message || challenge.value?.challenge || ''
+      )
       return response.data?.success || response.data?.data?.success || false
     } catch (err) {
       error.value = err.response?.data?.error || 'Verification failed'

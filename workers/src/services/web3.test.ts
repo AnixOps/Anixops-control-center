@@ -1,183 +1,242 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import {
+  isValidEthereumAddress,
+  generateNonce,
+  createSIWEMessage,
+  createDID,
+  parseDID,
+  uploadToIPFS,
+  getFromIPFS,
+  storeAuditOnChain,
+  getOnChainAudit,
+  ipfsUploadHandler,
+  ipfsGetHandler,
+  web3ChallengeHandler,
+  web3VerifyHandler,
+  web3AuditHandler,
+} from './web3'
+import type { Env } from '../types'
 
-describe('Web3 Service', () => {
-  describe('Ethereum Address Validation', () => {
-    it('validates correct Ethereum addresses', () => {
-      const isValidEthereumAddress = (address: string): boolean => {
-        return /^0x[a-fA-F0-9]{40}$/.test(address)
-      }
+function createEnv() {
+  const kv = new Map<string, string>()
+  const r2 = new Map<string, Uint8Array>()
 
-      expect(isValidEthereumAddress('0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18')).toBe(true)
-      expect(isValidEthereumAddress('0x0000000000000000000000000000000000000000')).toBe(true)
-    })
+  return {
+    KV: {
+      get: vi.fn(async (key: string) => kv.get(key) ?? null),
+      put: vi.fn(async (key: string, value: string) => {
+        kv.set(key, value)
+      }),
+      delete: vi.fn(async (key: string) => {
+        kv.delete(key)
+      }),
+    },
+    R2: {
+      put: vi.fn(async (key: string, value: string | ArrayBuffer | Uint8Array) => {
+        const bytes = typeof value === 'string'
+          ? new TextEncoder().encode(value)
+          : value instanceof Uint8Array
+            ? value
+            : new Uint8Array(value)
+        r2.set(key, bytes)
+      }),
+      get: vi.fn(async (key: string) => {
+        const value = r2.get(key)
+        if (!value) return null
+        return {
+          arrayBuffer: async () => value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength),
+        }
+      }),
+    },
+  } as unknown as Env & {
+    KV: {
+      get: ReturnType<typeof vi.fn>
+      put: ReturnType<typeof vi.fn>
+      delete: ReturnType<typeof vi.fn>
+    }
+    R2: {
+      put: ReturnType<typeof vi.fn>
+      get: ReturnType<typeof vi.fn>
+    }
+  }
+}
 
-    it('rejects invalid Ethereum addresses', () => {
-      const isValidEthereumAddress = (address: string): boolean => {
-        return /^0x[a-fA-F0-9]{40}$/.test(address)
-      }
+function createContext({ body, params, env, user }: {
+  body?: unknown
+  params?: Record<string, string>
+  env: Env
+  user?: unknown
+}) {
+  return {
+    env,
+    get: (key: string) => (key === 'user' ? user : undefined),
+    req: {
+      json: async () => body,
+      param: (name: string) => params?.[name],
+    },
+    json: (data: unknown, status = 200) => new Response(JSON.stringify(data), {
+      status,
+      headers: { 'Content-Type': 'application/json' },
+    }),
+  }
+}
 
-      expect(isValidEthereumAddress('0x123')).toBe(false)
-      expect(isValidEthereumAddress('742d35Cc6634C0532925a3b844Bc9e7595f2bD18')).toBe(false)
-      expect(isValidEthereumAddress('')).toBe(false)
+describe('web3 service', () => {
+  let env: ReturnType<typeof createEnv>
+
+  beforeEach(() => {
+    env = createEnv()
+  })
+
+  it('validates ethereum addresses', () => {
+    expect(isValidEthereumAddress('0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18')).toBe(true)
+    expect(isValidEthereumAddress('0x123')).toBe(false)
+  })
+
+  it('generates nonce and SIWE message', () => {
+    const nonce = generateNonce()
+    const message = createSIWEMessage('0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18', nonce)
+
+    expect(nonce).toHaveLength(64)
+    expect(message).toContain(nonce)
+    expect(message).toContain('Ethereum account')
+  })
+
+  it('creates and parses DID', () => {
+    const did = createDID('0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18')
+    expect(did).toBe('did:ethr:0x742d35cc6634c0532925a3b844bc9e7595f2bd18')
+    expect(parseDID(did)).toEqual({
+      method: 'ethr',
+      identifier: '0x742d35cc6634c0532925a3b844bc9e7595f2bd18',
     })
   })
 
-  describe('DID (Decentralized Identity)', () => {
-    it('creates DID from Ethereum address', () => {
-      const createDID = (address: string): string => {
-        return `did:ethr:${address.toLowerCase()}`
-      }
-
-      const address = '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18'
-      const did = createDID(address)
-
-      expect(did).toBe('did:ethr:0x742d35cc6634c0532925a3b844bc9e7595f2bd18')
-      expect(did.startsWith('did:ethr:')).toBe(true)
+  it('uploads to and reads from IPFS-backed R2 storage', async () => {
+    const upload = await uploadToIPFS(env, JSON.stringify({ hello: 'world' }), {
+      filename: 'test.json',
+      contentType: 'application/json',
     })
 
-    it('parses DID correctly', () => {
-      const parseDID = (did: string): { method: string; identifier: string } | null => {
-        const match = did.match(/^did:([^:]+):(.+)$/)
-        if (!match) return null
-        return { method: match[1], identifier: match[2] }
-      }
+    expect(upload.success).toBe(true)
+    expect(upload.cid).toBeDefined()
+    expect(upload.gatewayUrl).toContain(upload.cid!)
 
-      const result = parseDID('did:ethr:0x742d35cc6634c0532925a3b844bc9e7595f2bd18')
-
-      expect(result).not.toBeNull()
-      expect(result?.method).toBe('ethr')
-      expect(result?.identifier).toBe('0x742d35cc6634c0532925a3b844bc9e7595f2bd18')
-    })
+    const fetched = await getFromIPFS(env, upload.cid!)
+    expect(fetched.success).toBe(true)
+    const decoded = new TextDecoder().decode(fetched.data)
+    expect(decoded).toContain('hello')
   })
 
-  describe('SIWE Message Generation', () => {
-    it('creates valid SIWE message', () => {
-      const createSIWEMessage = (
-        address: string,
-        nonce: string,
-        domain: string = 'anixops.com'
-      ): string => {
-        return `${domain} wants you to sign in with your Ethereum account:
-${address}
-
-URI: https://${domain}
-Version: 1
-Chain ID: 1
-Nonce: ${nonce}
-Issued At: ${new Date().toISOString()}`
-      }
-
-      const address = '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18'
-      const nonce = 'abc123'
-      const message = createSIWEMessage(address, nonce)
-
-      expect(message).toContain(address)
-      expect(message).toContain(nonce)
-      expect(message).toContain('Ethereum account')
+  it('stores and retrieves on-chain audit metadata', async () => {
+    const stored = await storeAuditOnChain(env, {
+      action: 'node.restart',
+      userId: 1,
+      timestamp: '2026-03-23T00:00:00Z',
+      details: 'Restarted edge node',
     })
 
-    it('generates unique nonces', () => {
-      const generateNonce = (): string => {
-        const array = new Uint8Array(32)
-        // Mock random values
-        for (let i = 0; i < 32; i++) array[i] = i
-        return Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('')
-      }
+    expect(stored.success).toBe(true)
+    expect(stored.txHash).toMatch(/^0x[a-f0-9]{64}$/)
+    expect(stored.ipfsCid).toBeDefined()
 
-      const nonce1 = generateNonce()
-      const nonce2 = generateNonce()
+    const fetched = await getOnChainAudit(env, stored.txHash!)
+    expect(fetched.success).toBe(true)
+    expect(fetched.data?.action).toBe('node.restart')
+    expect(fetched.data?.ipfsCid).toBe(stored.ipfsCid)
+  })
+})
 
-      expect(nonce1).toHaveLength(64)
-    })
+describe('web3 handlers', () => {
+  let env: ReturnType<typeof createEnv>
+
+  beforeEach(() => {
+    env = createEnv()
   })
 
-  describe('IPFS Integration', () => {
-    it('generates CID format', () => {
-      const generateCID = async (content: Uint8Array): Promise<string> => {
-        // Simplified CID generation
-        const hashHex = Array.from(new Uint8Array(32))
-          .map((b) => b.toString(16).padStart(2, '0'))
-          .join('')
-        return `Qm${hashHex.slice(0, 44)}`
-      }
-
-      const content = new TextEncoder().encode('test content')
-
-      return generateCID(content).then((cid) => {
-        expect(cid.startsWith('Qm')).toBe(true)
-        expect(cid.length).toBe(46) // Qm + 44 chars
-      })
-    })
-
-    it('constructs gateway URLs correctly', () => {
-      const cid = 'QmX4jZ8vW2mKbR7nPf1vY9tLcA5eHdJkMsUoNpQrSvTwUx'
-      const gatewayUrl = `https://cloudflare-ipfs.com/ipfs/${cid}`
-
-      expect(gatewayUrl).toContain('cloudflare-ipfs.com')
-      expect(gatewayUrl).toContain(cid)
-    })
+  it('ipfsUploadHandler validates data', async () => {
+    const response = await ipfsUploadHandler(createContext({ body: {}, env }) as never)
+    expect(response.status).toBe(400)
   })
 
-  describe('On-Chain Audit', () => {
-    it('stores audit data with correct format', () => {
-      const auditData = {
+  it('ipfsUploadHandler returns cid and gateway url', async () => {
+    const response = await ipfsUploadHandler(createContext({
+      body: { data: '{"hello":"world"}', filename: 'hello.json' },
+      env,
+    }) as never)
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as { success: boolean; data: { cid: string; gatewayUrl: string } }
+    expect(data.success).toBe(true)
+    expect(data.data.cid).toBeDefined()
+    expect(data.data.gatewayUrl).toContain(data.data.cid)
+  })
+
+  it('ipfsGetHandler returns uploaded content', async () => {
+    const uploaded = await uploadToIPFS(env, '{"k":"v"}')
+    const response = await ipfsGetHandler(createContext({
+      params: { cid: uploaded.cid! },
+      env,
+    }) as never)
+
+    expect(response.status).toBe(200)
+    const text = await response.text()
+    expect(text).toContain('k')
+  })
+
+  it('web3ChallengeHandler validates address and stores nonce', async () => {
+    const bad = await web3ChallengeHandler(createContext({ body: { address: 'bad' }, env }) as never)
+    expect(bad.status).toBe(400)
+
+    const good = await web3ChallengeHandler(createContext({
+      body: { address: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18' },
+      env,
+    }) as never)
+    expect(good.status).toBe(200)
+    const data = await good.json() as { success: boolean; data: { message: string; nonce: string } }
+    expect(data.success).toBe(true)
+    expect(data.data.message).toContain(data.data.nonce)
+  })
+
+  it('web3VerifyHandler requires address signature and message', async () => {
+    const response = await web3VerifyHandler(createContext({ body: {}, env }) as never)
+    expect(response.status).toBe(400)
+  })
+
+  it('web3VerifyHandler returns did for valid payload', async () => {
+    const response = await web3VerifyHandler(createContext({
+      body: {
+        address: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
+        signature: '0xsigned',
+        message: 'anixops.com wants you to sign in',
+      },
+      env,
+    }) as never)
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as { success: boolean; data: { did: string } }
+    expect(data.success).toBe(true)
+    expect(data.data.did).toContain('did:ethr:')
+  })
+
+  it('web3AuditHandler validates required fields', async () => {
+    const bad = await web3AuditHandler(createContext({ body: {}, env }) as never)
+    expect(bad.status).toBe(400)
+
+    const good = await web3AuditHandler(createContext({
+      body: {
         action: 'node.restart',
         userId: 1,
-        timestamp: new Date().toISOString(),
-        details: 'Restarted node server-1',
-      }
+        timestamp: '2026-03-23T00:00:00Z',
+        details: 'Restarted edge node',
+      },
+      env,
+      user: { sub: 1 },
+    }) as never)
 
-      expect(auditData.action).toBe('node.restart')
-      expect(auditData.userId).toBe(1)
-    })
-
-    it('generates transaction hash format', () => {
-      const generateTxHash = (): string => {
-        return `0x${Array.from(new Uint8Array(32))
-          .map((b) => b.toString(16).padStart(2, '0'))
-          .join('')}`
-      }
-
-      const txHash = generateTxHash()
-
-      expect(txHash.startsWith('0x')).toBe(true)
-      expect(txHash.length).toBe(66) // 0x + 64 hex chars
-    })
-
-    it('links audit to IPFS CID', () => {
-      const audit = {
-        txHash: '0x123...abc',
-        ipfsCid: 'QmX4jZ8vW2mKbR7nPf1vY9tLcA5eHdJkMsUoNpQrSvTwUx',
-        timestamp: new Date().toISOString(),
-      }
-
-      expect(audit.txHash).toBeDefined()
-      expect(audit.ipfsCid).toBeDefined()
-    })
-  })
-
-  describe('Web3 Authentication Flow', () => {
-    it('validates complete auth flow', async () => {
-      // Step 1: Generate challenge
-      const challenge = {
-        message: 'anixops.com wants you to sign in...',
-        nonce: 'abc123',
-      }
-
-      expect(challenge.message).toBeDefined()
-      expect(challenge.nonce).toBeDefined()
-
-      // Step 2: Verify signature (mocked)
-      const verification = {
-        address: '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
-        isValid: true,
-      }
-
-      expect(verification.isValid).toBe(true)
-
-      // Step 3: Generate DID
-      const did = `did:ethr:${verification.address.toLowerCase()}`
-      expect(did.startsWith('did:ethr:')).toBe(true)
-    })
+    expect(good.status).toBe(200)
+    const data = await good.json() as { success: boolean; data: { txHash: string; ipfsCid: string } }
+    expect(data.success).toBe(true)
+    expect(data.data.txHash).toMatch(/^0x[a-f0-9]{64}$/)
+    expect(data.data.ipfsCid).toBeDefined()
   })
 })

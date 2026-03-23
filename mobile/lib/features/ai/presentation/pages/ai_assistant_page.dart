@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/services/api_client.dart';
+import 'package:anixops_mobile/core/services/api_client.dart';
 
 /// AI Chat message model
 class ChatMessage {
@@ -105,8 +105,16 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI Assistant'),
-        subtitle: const Text('Powered by Workers AI'),
+        title: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('AI Assistant'),
+            Text(
+              'Powered by Workers AI',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline),
