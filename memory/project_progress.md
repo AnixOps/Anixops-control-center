@@ -7,20 +7,24 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.15`
+**Version**: `v2.0.0-rc.17`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.15
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.17
 
 ## Test Summary
 | Platform | Tests | Status |
 |----------|-------|--------|
-| Web Frontend | 5 | ✅ Passing |
+| Web Frontend | 20 | ✅ Passing |
 | Mobile App | 102 | ✅ Passing |
 | Workers API | 342 | ✅ Passing |
-| **Total** | **449** | ✅ |
+| **Total** | **464** | ✅ |
 
-## Recent Changes (v2.0.0-rc.15)
+## Recent Changes (v2.0.0-rc.17)
+- Add users.store.test.js with 10 tests
+- Web: 20, Mobile: 102, Workers: 342 tests
+
+## Recent Changes (v2.0.0-rc.16)
 - Add web frontend testing with vitest
 - Add auth.store.test.js with 5 tests
 - Web: 5, Mobile: 102, Workers: 342 tests
