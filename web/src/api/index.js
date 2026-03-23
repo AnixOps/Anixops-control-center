@@ -1,8 +1,11 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 
+// Use environment variable or default to Workers API
+const baseURL = import.meta.env.VITE_API_URL || 'https://api.anixops.com/api/v1'
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'

@@ -12,11 +12,14 @@ export const useAuthStore = defineStore('auth', () => {
   async function login(email, password) {
     try {
       const response = await api.post('/auth/login', { email, password })
-      token.value = response.data.access_token
+
+      // Handle Workers API response format: { success: true, data: { access_token, user } }
+      const data = response.data.data || response.data
+      token.value = data.access_token
       user.value = {
-        id: response.data.user_id || '1',
-        email: email,
-        role: response.data.role || 'admin'
+        id: data.user?.id || '1',
+        email: data.user?.email || email,
+        role: data.user?.role || 'admin'
       }
 
       localStorage.setItem('token', token.value)
@@ -41,7 +44,8 @@ export const useAuthStore = defineStore('auth', () => {
   async function refreshToken() {
     try {
       const response = await api.post('/auth/refresh')
-      token.value = response.data.access_token
+      const data = response.data.data || response.data
+      token.value = data.access_token
       localStorage.setItem('token', token.value)
       return true
     } catch {
