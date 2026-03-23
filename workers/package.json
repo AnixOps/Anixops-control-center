@@ -1,6 +1,6 @@
 {
   "name": "anixops-api",
-  "version": "1.0.0",
+  "version": "2.5.0",
   "description": "AnixOps Control Center API - Cloudflare Workers",
   "main": "src/index.ts",
   "scripts": {
@@ -26,6 +26,6 @@
     "@vitest/coverage-v8": "^1.2.0",
     "typescript": "^5.3.0",
     "vitest": "^1.2.0",
-    "wrangler": "^3.24.0"
+    "wrangler": "^4.76.0"
   }
 }

@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:anixops_mobile/core/providers/api_providers.dart';
+import 'package:anixops_mobile/core/services/sse_service.dart';
 
 /// Node model
 class Node {
@@ -135,8 +137,39 @@ class NodesState {
 /// Nodes notifier
 class NodesNotifier extends StateNotifier<NodesState> {
   final Ref _ref;
+  StreamSubscription<bool>? _connectionSubscription;
 
-  NodesNotifier(this._ref) : super(const NodesState());
+  NodesNotifier(this._ref) : super(const NodesState()) {
+    _bindRealtimeUpdates();
+  }
+
+  void _bindRealtimeUpdates() {
+    final sse = _ref.read(sseServiceProvider);
+
+    sse.on('node_update', _handleNodeUpdate);
+    _connectionSubscription = sse.connectionState.listen((connected) {
+      if (connected && !sse.subscribedChannels.contains('nodes')) {
+        unawaited(sse.subscribe('nodes'));
+      }
+    });
+  }
+
+  void _handleNodeUpdate(dynamic payload) {
+    if (payload is! Map) return;
+
+    final nodeId = payload['node_id']?.toString();
+    if (nodeId == null || nodeId.isEmpty) return;
+
+    if (payload['status'] != null ||
+        payload['users'] != null ||
+        payload['traffic'] != null ||
+        payload['cpu_usage'] != null ||
+        payload['memory_usage'] != null ||
+        payload['last_seen'] != null ||
+        payload['version'] != null) {
+      updateNodeStats(nodeId, Map<String, dynamic>.from(payload));
+    }
+  }
 
   Future<void> fetchNodes({int? page, bool refresh = false}) async {
     if (state.loading) return;
@@ -282,6 +315,13 @@ class NodesNotifier extends StateNotifier<NodesState> {
       return n;
     }).toList();
     state = state.copyWith(nodes: nodes);
+  }
+  @override
+  void dispose() {
+    final sse = _ref.read(sseServiceProvider);
+    sse.off('node_update', _handleNodeUpdate);
+    _connectionSubscription?.cancel();
+    super.dispose();
   }
 }
 

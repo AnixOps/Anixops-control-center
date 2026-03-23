@@ -5,6 +5,8 @@ import 'privacy_policy_page.dart';
 import 'terms_of_service_page.dart';
 import 'profile_page.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/providers/locale_provider.dart';
+import '../providers/mfa_provider.dart';
 
 // Settings State
 class SettingsState {
@@ -115,9 +117,19 @@ class SettingsPage extends ConsumerWidget {
           SwitchListTile(
             secondary: const Icon(Icons.security),
             title: const Text('Two-Factor Authentication'),
-            subtitle: const Text('Add extra security to your account'),
-            value: state.twoFactorEnabled,
-            onChanged: (value) => ref.read(settingsProvider.notifier).setTwoFactor(value),
+            subtitle: Text(
+              ref.watch(mfaProvider).status?.enabled == true
+                  ? 'Enabled - Tap to manage'
+                  : 'Add extra security to your account',
+            ),
+            value: ref.watch(mfaProvider).status?.enabled ?? false,
+            onChanged: (value) {
+              if (value) {
+                _showMFASetupDialog(context, ref);
+              } else {
+                _showMFADisableDialog(context, ref);
+              }
+            },
           ),
           ListTile(
             leading: const Icon(Icons.vpn_key_outlined),
@@ -424,6 +436,7 @@ class SettingsPage extends ConsumerWidget {
               groupValue: currentValue,
               onChanged: (value) {
                 ref.read(settingsProvider.notifier).setTheme(value!);
+                ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.light);
                 Navigator.pop(context);
               },
             ),
@@ -433,6 +446,7 @@ class SettingsPage extends ConsumerWidget {
               groupValue: currentValue,
               onChanged: (value) {
                 ref.read(settingsProvider.notifier).setTheme(value!);
+                ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark);
                 Navigator.pop(context);
               },
             ),
@@ -442,6 +456,7 @@ class SettingsPage extends ConsumerWidget {
               groupValue: currentValue,
               onChanged: (value) {
                 ref.read(settingsProvider.notifier).setTheme(value!);
+                ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.system);
                 Navigator.pop(context);
               },
             ),
@@ -465,15 +480,47 @@ class SettingsPage extends ConsumerWidget {
               groupValue: currentValue,
               onChanged: (value) {
                 ref.read(settingsProvider.notifier).setLanguage(value!);
+                ref.read(localeProvider.notifier).setLocale(const Locale('en'));
                 Navigator.pop(context);
               },
             ),
             RadioListTile<String>(
-              title: const Text('中文'),
+              title: const Text('简体中文'),
               value: 'zh',
               groupValue: currentValue,
               onChanged: (value) {
                 ref.read(settingsProvider.notifier).setLanguage(value!);
+                ref.read(localeProvider.notifier).setLocale(const Locale('zh'));
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('日本語'),
+              value: 'ja',
+              groupValue: currentValue,
+              onChanged: (value) {
+                ref.read(settingsProvider.notifier).setLanguage(value!);
+                ref.read(localeProvider.notifier).setLocale(const Locale('ja', 'JP'));
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('繁體中文'),
+              value: 'zh_TW',
+              groupValue: currentValue,
+              onChanged: (value) {
+                ref.read(settingsProvider.notifier).setLanguage(value!);
+                ref.read(localeProvider.notifier).setLocale(const Locale('zh', 'TW'));
+                Navigator.pop(context);
+              },
+            ),
+            RadioListTile<String>(
+              title: const Text('العربية'),
+              value: 'ar',
+              groupValue: currentValue,
+              onChanged: (value) {
+                ref.read(settingsProvider.notifier).setLanguage(value!);
+                ref.read(localeProvider.notifier).setLocale(const Locale('ar', 'SA'));
                 Navigator.pop(context);
               },
             ),
@@ -536,6 +583,194 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  void _showMFASetupDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _MFASetupDialog(ref: ref),
+    );
+  }
+
+  void _showMFADisableDialog(BuildContext context, WidgetRef ref) {
+    final codeController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disable Two-Factor Authentication'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Enter your verification code to disable 2FA:'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: codeController,
+              decoration: const InputDecoration(
+                labelText: 'Verification Code',
+                hintText: '6-digit code',
+              ),
+              keyboardType: TextInputType.number,
+              maxLength: 6,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final success = await ref.read(mfaProvider.notifier).disable(codeController.text);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(success ? '2FA disabled' : 'Failed to disable 2FA')),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Disable'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// MFA Setup Dialog with QR code display
+class _MFASetupDialog extends ConsumerStatefulWidget {
+  final WidgetRef ref;
+
+  const _MFASetupDialog({required this.ref});
+
+  @override
+  ConsumerState<_MFASetupDialog> createState() => _MFASetupDialogState();
+}
+
+class _MFASetupDialogState extends ConsumerState<_MFASetupDialog> {
+  final _codeController = TextEditingController();
+  bool _isVerifying = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(mfaProvider.notifier).setup());
+  }
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mfaState = ref.watch(mfaProvider);
+
+    return AlertDialog(
+      title: const Text('Setup Two-Factor Authentication'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (mfaState.isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (mfaState.setupResult != null) ...[
+              const Text('1. Scan this QR code with your authenticator app:'),
+              const SizedBox(height: 16),
+              // QR code placeholder - in real app, use qr_flutter package
+              Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.qr_code_2, size: 100),
+                    Text(
+                      'Secret: ${mfaState.setupResult!.secret.substring(0, 8)}...',
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('2. Enter the 6-digit code from your app:'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _codeController,
+                decoration: const InputDecoration(
+                  labelText: 'Verification Code',
+                  hintText: '000000',
+                ),
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+              ),
+              const SizedBox(height: 16),
+              const Text('3. Save these recovery codes:'),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: mfaState.setupResult!.recoveryCodes.take(4).map((code) {
+                    return Text(code, style: const TextStyle(fontFamily: 'monospace'));
+                  }).toList(),
+                ),
+              ),
+            ],
+            if (mfaState.error != null)
+              Text(
+                mfaState.error!,
+                style: const TextStyle(color: Colors.red),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            ref.read(mfaProvider.notifier).clearSetupResult();
+            Navigator.pop(context);
+          },
+          child: const Text('Cancel'),
+        ),
+        if (mfaState.setupResult != null)
+          ElevatedButton(
+            onPressed: _isVerifying
+                ? null
+                : () async {
+                    setState(() => _isVerifying = true);
+                    final success = await ref.read(mfaProvider.notifier).enable(_codeController.text);
+                    setState(() => _isVerifying = false);
+
+                    if (success && context.mounted) {
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('2FA enabled successfully')),
+                      );
+                    }
+                  },
+            child: _isVerifying
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Verify & Enable'),
+          ),
+      ],
     );
   }
 }

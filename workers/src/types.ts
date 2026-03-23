@@ -16,6 +16,12 @@ export interface Env {
   // R2 存储桶
   R2: R2Bucket
 
+  // Workers AI
+  AI: Ai
+
+  // Vectorize 向量数据库
+  VECTORIZE: VectorizeIndex
+
   // Durable Objects - 暂时禁用
   // WEBSOCKET_SERVER: DurableObjectNamespace
 }

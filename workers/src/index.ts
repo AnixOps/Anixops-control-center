@@ -19,7 +19,31 @@ import { listTasksHandler, getTaskHandler, createTaskHandler, cancelTaskHandler,
 import { listSchedulesHandler, getScheduleHandler, createScheduleHandler, updateScheduleHandler, deleteScheduleHandler, toggleScheduleHandler, runScheduleNowHandler } from './handlers/schedules'
 import { listNodeGroupsHandler, getNodeGroupHandler, createNodeGroupHandler, updateNodeGroupHandler, deleteNodeGroupHandler, addNodesToGroupHandler, removeNodesFromGroupHandler } from './handlers/node-groups'
 import { sseHandler, sseSubscribeHandler, sseUnsubscribeHandler, sseStatusHandler } from './handlers/sse'
+import { websocketHandler } from './handlers/websocket'
 import { createBackupHandler, listBackupsHandler, getBackupHandler, deleteBackupHandler, downloadBackupHandler, restoreBackupHandler, cleanupBackupsHandler, backupStatusHandler } from './handlers/backup'
+
+// AI Services
+import {
+  aiChatHandler,
+  aiAnalyzeLogHandler,
+  aiOpsAdviceHandler,
+  aiEmbeddingHandler,
+  aiQueryHandler,
+} from './services/ai'
+import {
+  vectorSearchHandler,
+  vectorInsertHandler,
+  vectorDeleteHandler,
+} from './services/vectorize'
+
+// Web3 Services
+import {
+  ipfsUploadHandler,
+  ipfsGetHandler,
+  web3ChallengeHandler,
+  web3VerifyHandler,
+  web3AuditHandler,
+} from './services/web3'
 import {
   registerAgentHandler,
   agentHeartbeatHandler,
@@ -127,6 +151,8 @@ app.use('*', cors({
       'http://localhost:5173',
       'https://anixops.pages.dev',
       'https://anixops.dev',
+      'https://www.anixops.dev',
+      'https://api.anixops.com',
     ]
     if (allowed.includes(origin)) return origin
     return allowed[0]
@@ -180,23 +206,23 @@ app.delete('/api/v1/users/:id', authMiddleware, rbacMiddleware(['admin']), delet
 app.get('/api/v1/users/:id/lockout', authMiddleware, rbacMiddleware(['admin']), getUserLockoutHandler)
 app.post('/api/v1/users/:id/unlock', authMiddleware, rbacMiddleware(['admin']), unlockUserHandler)
 
-// SSH导入
-app.post('/api/v1/ssh/test', authMiddleware, rbacMiddleware(['admin', 'operator']), testConnectionHandler)
-app.post('/api/v1/ssh/import', authMiddleware, rbacMiddleware(['admin', 'operator']), importServerHandler)
-app.post('/api/v1/ssh/detect', authMiddleware, rbacMiddleware(['admin', 'operator']), detectServerTypeHandler)
+// SSH导入 - 所有登录用户都可以导入服务器
+app.post('/api/v1/ssh/test', authMiddleware, testConnectionHandler)
+app.post('/api/v1/ssh/import', authMiddleware, importServerHandler)
+app.post('/api/v1/ssh/detect', authMiddleware, detectServerTypeHandler)
 
-// 节点管理
-app.get('/api/v1/nodes', authMiddleware, cacheMiddleware({ ttl: 30, private: true }), listNodesHandler)
+// 节点管理 - 所有登录用户可查看和添加，operator/admin可操作，仅admin可删除
+app.get('/api/v1/nodes', authMiddleware, listNodesHandler)
 app.get('/api/v1/nodes/:id', authMiddleware, getNodeHandler)
 app.get('/api/v1/nodes/:id/stats', authMiddleware, getNodeStatsHandler)
 app.get('/api/v1/nodes/:id/logs', authMiddleware, getNodeLogsHandler)
-app.post('/api/v1/nodes', authMiddleware, rbacMiddleware(['admin', 'operator']), createNodeHandler)
+app.post('/api/v1/nodes', authMiddleware, createNodeHandler)  // 所有登录用户可添加
 app.post('/api/v1/nodes/bulk', authMiddleware, rbacMiddleware(['admin', 'operator']), bulkActionHandler)
 app.post('/api/v1/nodes/bulk-status', authMiddleware, rbacMiddleware(['admin', 'operator']), bulkNodeStatusHandler)
 app.post('/api/v1/nodes/:id/start', authMiddleware, rbacMiddleware(['admin', 'operator']), startNodeHandler)
 app.post('/api/v1/nodes/:id/stop', authMiddleware, rbacMiddleware(['admin', 'operator']), stopNodeHandler)
 app.post('/api/v1/nodes/:id/restart', authMiddleware, rbacMiddleware(['admin', 'operator']), restartNodeHandler)
-app.post('/api/v1/nodes/:id/test', authMiddleware, testNodeConnectionHandler)
+app.post('/api/v1/nodes/:id/test', authMiddleware, testNodeConnectionHandler)  // 所有用户可测试连接
 app.post('/api/v1/nodes/:id/sync', authMiddleware, rbacMiddleware(['admin', 'operator']), syncNodeHandler)
 app.put('/api/v1/nodes/:id', authMiddleware, rbacMiddleware(['admin', 'operator']), updateNodeHandler)
 app.delete('/api/v1/nodes/:id', authMiddleware, rbacMiddleware(['admin']), deleteNodeHandler)
@@ -364,14 +390,42 @@ app.put('/api/v1/lb/:id/targets/:targetId/weight', authMiddleware, rbacMiddlewar
 app.post('/api/v1/lb/:id/targets/:targetId/complete', authMiddleware, recordCompletionHandler)
 
 // ==================== WebSocket ====================
-// WebSocket 暂时禁用 - Durable Object 有问题
-/*
-app.get('/api/v1/ws', async (c) => {
-  const id = c.env.WEBSOCKET_SERVER.idFromName('global')
-  const stub = c.env.WEBSOCKET_SERVER.get(id)
-  return stub.fetch(c.req.raw)
-})
-*/
+// WebSocket 实时通信端点
+app.get('/api/v1/ws', authMiddleware, websocketHandler)
+
+// ==================== AI Services ====================
+// AI 聊天助手
+app.post('/api/v1/ai/chat', authMiddleware, aiChatHandler)
+// AI 日志分析
+app.post('/api/v1/ai/analyze-log', authMiddleware, aiAnalyzeLogHandler)
+// AI 运维建议
+app.post('/api/v1/ai/ops-advice', authMiddleware, aiOpsAdviceHandler)
+// AI 文本嵌入
+app.post('/api/v1/ai/embedding', authMiddleware, aiEmbeddingHandler)
+// AI 查询转换
+app.post('/api/v1/ai/query', authMiddleware, aiQueryHandler)
+
+// ==================== Vectorize ====================
+// 向量搜索
+app.post('/api/v1/vectors/search', authMiddleware, vectorSearchHandler)
+// 向量插入
+app.post('/api/v1/vectors', authMiddleware, vectorInsertHandler)
+// 向量删除
+app.delete('/api/v1/vectors/:id', authMiddleware, vectorDeleteHandler)
+
+// ==================== Web3 / IPFS ====================
+// IPFS 上传
+app.post('/api/v1/ipfs/upload', authMiddleware, ipfsUploadHandler)
+// IPFS 获取
+app.get('/api/v1/ipfs/:cid', ipfsGetHandler)
+
+// ==================== Web3 / Ethereum ====================
+// Web3 登录挑战
+app.post('/api/v1/web3/challenge', web3ChallengeHandler)
+// Web3 登录验证
+app.post('/api/v1/web3/verify', web3VerifyHandler)
+// 链上审计
+app.post('/api/v1/web3/audit', authMiddleware, web3AuditHandler)
 
 // ==================== 错误处理 ====================
 
@@ -393,88 +447,6 @@ app.onError((err, c) => {
 
   return c.json({ success: false, error: 'Internal Server Error' }, 500)
 })
-
-// ==================== Durable Object ====================
-// 暂时禁用以调试 Cloudflare 错误 1101
-/*
-export class WebSocketServer {
-  private state: DurableObjectState
-  private sessions: Map<WebSocket, { userId?: number }>
-
-  constructor(state: DurableObjectState) {
-    this.state = state
-    this.sessions = new Map()
-  }
-
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url)
-
-    if (url.pathname === '/api/v1/ws') {
-      const { 0: client, 1: server } = new WebSocketPair()
-
-      this.handleSession(server)
-
-      return new Response(null, { status: 101, webSocket: client })
-    }
-
-    return new Response('Not Found', { status: 404 })
-  }
-
-  private handleSession(ws: WebSocket) {
-    ws.accept()
-    this.sessions.set(ws, {})
-
-    ws.addEventListener('message', async (event) => {
-      try {
-        const data = JSON.parse(event.data as string)
-        await this.handleMessage(ws, data)
-      } catch (err) {
-        ws.send(JSON.stringify({ error: 'Invalid message format' }))
-      }
-    })
-
-    ws.addEventListener('close', () => {
-      this.sessions.delete(ws)
-    })
-
-    ws.addEventListener('error', () => {
-      this.sessions.delete(ws)
-    })
-  }
-
-  private async handleMessage(ws: WebSocket, data: { type: string; payload?: unknown }) {
-    switch (data.type) {
-      case 'ping':
-        ws.send(JSON.stringify({ type: 'pong' }))
-        break
-
-      case 'subscribe':
-        // 订阅节点状态更新
-        ws.send(JSON.stringify({ type: 'subscribed', channel: data.payload }))
-        break
-
-      case 'unsubscribe':
-        // 取消订阅
-        ws.send(JSON.stringify({ type: 'unsubscribed', channel: data.payload }))
-        break
-
-      default:
-        ws.send(JSON.stringify({ error: 'Unknown message type' }))
-    }
-  }
-
-  // 广播消息给所有连接
-  broadcast(message: unknown) {
-    for (const [ws] of this.sessions) {
-      try {
-        ws.send(JSON.stringify(message))
-      } catch {
-        this.sessions.delete(ws)
-      }
-    }
-  }
-}
-*/
 
 // Export
 export default app

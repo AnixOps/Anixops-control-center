@@ -20,7 +20,7 @@ permissions:
   contents: write
 
 env:
-  FLUTTER_VERSION: '3.24.0'
+  FLUTTER_VERSION: '3.41.5'
 
 jobs:
   # ==================== Android ====================
@@ -61,7 +61,13 @@ jobs:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           mkdir -p mobile/android/keystore
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > mobile/android/keystore/anixops-release.jks
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > mobile/android/keystore/anixops-release.jks
+            echo "KEYSTORE_AVAILABLE=true" >> $GITHUB_ENV
+          else
+            echo "KEYSTORE_AVAILABLE=false" >> $GITHUB_ENV
+            echo "No keystore secrets found, using debug signing"
+          fi
 
       - name: Build APK
         working-directory: mobile
@@ -70,12 +76,14 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
         run: |
-          cat > android/key.properties << EOF
+          if [ "$KEYSTORE_AVAILABLE" = "true" ]; then
+            cat > android/key.properties << EOF
           storePassword=$ANDROID_STORE_PASSWORD
           keyPassword=$ANDROID_KEY_PASSWORD
           keyAlias=$ANDROID_KEY_ALIAS
           storeFile=../keystore/anixops-release.jks
           EOF
+          fi
           flutter build apk --release --shrink
 
       - name: Build AAB

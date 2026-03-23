@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:window_manager/window_manager.dart';
 import 'package:anixops_mobile/core/theme/app_theme.dart';
 
 /// Custom window title bar with minimize, maximize, close buttons
@@ -16,8 +17,38 @@ class WindowTitleBar extends StatefulWidget {
   State<WindowTitleBar> createState() => _WindowTitleBarState();
 }
 
-class _WindowTitleBarState extends State<WindowTitleBar> {
+class _WindowTitleBarState extends State<WindowTitleBar> with WindowListener {
   bool _isMaximized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    windowManager.addListener(this);
+    _checkMaximized();
+  }
+
+  @override
+  void dispose() {
+    windowManager.removeListener(this);
+    super.dispose();
+  }
+
+  @override
+  void onWindowMaximize() {
+    setState(() => _isMaximized = true);
+  }
+
+  @override
+  void onWindowUnmaximize() {
+    setState(() => _isMaximized = false);
+  }
+
+  Future<void> _checkMaximized() async {
+    final isMax = await windowManager.isMaximized();
+    if (mounted) {
+      setState(() => _isMaximized = isMax);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,11 +70,9 @@ class _WindowTitleBarState extends State<WindowTitleBar> {
             child: GestureDetector(
               behavior: HitTestBehavior.translucent,
               onPanStart: (_) {
-                // Start window drag
-                _startDrag();
+                windowManager.startDragging();
               },
               onDoubleTap: () {
-                // Toggle maximize on double click
                 _toggleMaximize();
               },
               child: Container(
@@ -96,28 +125,20 @@ class _WindowTitleBarState extends State<WindowTitleBar> {
     );
   }
 
-  void _startDrag() {
-    // In a real implementation, use window_manager package
-    // windowManager.startDragging();
-  }
-
   void _minimize() {
-    // windowManager.minimize();
+    windowManager.minimize();
   }
 
-  void _toggleMaximize() {
-    setState(() {
-      _isMaximized = !_isMaximized;
-    });
-    // if (_isMaximized) {
-    //   windowManager.unmaximize();
-    // } else {
-    //   windowManager.maximize();
-    // }
+  Future<void> _toggleMaximize() async {
+    if (_isMaximized) {
+      await windowManager.unmaximize();
+    } else {
+      await windowManager.maximize();
+    }
   }
 
   void _close() {
-    // windowManager.close();
+    windowManager.close();
   }
 }
 

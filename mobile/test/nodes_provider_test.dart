@@ -1,5 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:anixops_mobile/features/nodes/presentation/providers/nodes_provider.dart';
 
 void main() {
@@ -111,6 +111,41 @@ void main() {
       );
 
       expect(state.offlineCount, 1);
+    });
+
+    test('RC3 realtime node stats merge preserves existing fields', () {
+      const original = Node(
+        id: '1',
+        name: 'edge-node',
+        host: '10.0.0.1',
+        status: 'offline',
+        users: 2,
+        traffic: 100,
+      );
+
+      final updated = Node(
+        id: original.id,
+        name: original.name,
+        host: original.host,
+        port: original.port,
+        status: 'online',
+        type: original.type,
+        users: 9,
+        traffic: 2048,
+        lastSeen: original.lastSeen,
+        cpuUsage: 0.42,
+        memoryUsage: 0.81,
+        version: '2.5.0-rc.3',
+      );
+
+      expect(updated.id, '1');
+      expect(updated.name, 'edge-node');
+      expect(updated.status, 'online');
+      expect(updated.users, 9);
+      expect(updated.traffic, 2048);
+      expect(updated.cpuUsage, 0.42);
+      expect(updated.memoryUsage, 0.81);
+      expect(updated.version, '2.5.0-rc.3');
     });
   });
 }

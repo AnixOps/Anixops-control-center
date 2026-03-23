@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 
-/// WebSocket service for real-time communication
+/// WebSocket service for real-time communication with Workers API
 class WebSocketService {
   WebSocketChannel? _channel;
   final Map<String, List<Function(dynamic)>> _handlers = {};
@@ -12,9 +12,11 @@ class WebSocketService {
   String? _url;
   String? _token;
   bool _isConnecting = false;
+  bool _shouldReconnect = true;
   int _reconnectAttempts = 0;
-  static const int _maxReconnectAttempts = 5;
-  static const Duration _reconnectDelay = Duration(seconds: 3);
+  static const int _maxReconnectAttempts = 10;
+  static const Duration _baseReconnectDelay = Duration(seconds: 1);
+  static const Duration _maxReconnectDelay = Duration(seconds: 30);
   static const Duration _heartbeatInterval = Duration(seconds: 30);
 
   /// Whether the WebSocket is connected
@@ -24,21 +26,43 @@ class WebSocketService {
   final StreamController<bool> _connectionStateController = StreamController<bool>.broadcast();
   Stream<bool> get connectionState => _connectionStateController.stream;
 
+  /// Subscribed channels
+  final Set<String> _subscribedChannels = {};
+  Set<String> get subscribedChannels => Set.unmodifiable(_subscribedChannels);
+
   /// Connect to WebSocket server
+  /// Note: Workers API uses Bearer token in Authorization header
+  /// For WebSocket, we pass token in query parameter
   Future<void> connect(String url, {String? token}) async {
     if (_isConnecting || isConnected) return;
 
     _url = url;
     _token = token;
     _isConnecting = true;
+    _shouldReconnect = true;
 
     try {
       final uri = Uri.parse(url);
-      final wsUrl = uri.replace(scheme: uri.scheme == 'https' ? 'wss' : 'ws');
 
-      _channel = WebSocketChannel.connect(
-        Uri.parse('$wsUrl?token=$token'),
+      // Convert HTTP(S) to WS(S)
+      String wsScheme;
+      if (uri.scheme == 'https' || uri.scheme == 'wss') {
+        wsScheme = 'wss';
+      } else {
+        wsScheme = 'ws';
+      }
+
+      // Build WebSocket URL with token for auth
+      // Workers API expects token in query param or header
+      final wsUri = Uri(
+        scheme: wsScheme,
+        host: uri.host,
+        port: uri.port,
+        path: uri.path,
+        queryParameters: token != null ? {'token': token} : null,
       );
+
+      _channel = WebSocketChannel.connect(wsUri);
 
       await _channel!.ready;
       _isConnecting = false;
@@ -56,54 +80,94 @@ class WebSocketService {
       );
     } catch (e) {
       _isConnecting = false;
-      _scheduleReconnect();
+      _connectionStateController.add(false);
+      if (_shouldReconnect) {
+        _scheduleReconnect();
+      }
     }
   }
 
   /// Disconnect from WebSocket server
   void disconnect() {
+    _shouldReconnect = false;
     _reconnectTimer?.cancel();
     _heartbeatTimer?.cancel();
     _channel?.sink.close(status.goingAway);
     _channel = null;
+    _subscribedChannels.clear();
     _connectionStateController.add(false);
   }
 
-  /// Subscribe to an event
-  void on(String event, Function(dynamic) handler) {
-    _handlers.putIfAbsent(event, () => []).add(handler);
+  /// Subscribe to an event type
+  void on(String eventType, Function(dynamic) handler) {
+    _handlers.putIfAbsent(eventType, () => []).add(handler);
   }
 
-  /// Unsubscribe from an event
-  void off(String event, [Function(dynamic)? handler]) {
+  /// Unsubscribe from an event type
+  void off(String eventType, [Function(dynamic)? handler]) {
     if (handler == null) {
-      _handlers.remove(event);
+      _handlers.remove(eventType);
     } else {
-      _handlers[event]?.remove(handler);
+      _handlers[eventType]?.remove(handler);
     }
   }
 
-  /// Emit an event to the server
-  void emit(String event, dynamic data) {
+  /// Send a message to the server
+  void send(String type, {dynamic payload}) {
     if (!isConnected) return;
 
     final message = jsonEncode({
-      'event': event,
-      'data': data,
+      'type': type,
+      'payload': payload,
     });
 
     _channel?.sink.add(message);
   }
 
+  /// Subscribe to a channel
+  void subscribeToChannel(String channel) {
+    _subscribedChannels.add(channel);
+    send('subscribe', payload: channel);
+  }
+
+  /// Unsubscribe from a channel
+  void unsubscribeFromChannel(String channel) {
+    _subscribedChannels.remove(channel);
+    send('unsubscribe', payload: channel);
+  }
+
   void _onMessage(dynamic message) {
     try {
       final decoded = jsonDecode(message);
-      final event = decoded['event'] as String?;
-      final data = decoded['data'];
 
-      if (event != null && _handlers.containsKey(event)) {
-        for (final handler in _handlers[event]!) {
-          handler(data);
+      // Workers API format: { type: '...', payload: ..., timestamp: '...' }
+      final type = decoded['type'] as String?;
+      final payload = decoded['payload'] ?? decoded['data'];
+
+      // Handle pong
+      if (type == 'pong') {
+        return;
+      }
+
+      // Dispatch to handlers by type
+      if (type != null && _handlers.containsKey(type)) {
+        for (final handler in List.from(_handlers[type]!)) {
+          try {
+            handler(payload);
+          } catch (e) {
+            // Handler error, continue
+          }
+        }
+      }
+
+      // Also dispatch to 'message' handlers
+      if (_handlers.containsKey('message')) {
+        for (final handler in List.from(_handlers['message']!)) {
+          try {
+            handler(decoded);
+          } catch (e) {
+            // Handler error, continue
+          }
         }
       }
     } catch (e) {
@@ -113,19 +177,30 @@ class WebSocketService {
 
   void _onError(dynamic error) {
     _connectionStateController.add(false);
-    _scheduleReconnect();
+    if (_shouldReconnect) {
+      _scheduleReconnect();
+    }
   }
 
   void _onDone() {
     _connectionStateController.add(false);
-    _scheduleReconnect();
+    if (_shouldReconnect) {
+      _scheduleReconnect();
+    }
   }
 
   void _scheduleReconnect() {
+    if (!_shouldReconnect) return;
     if (_reconnectAttempts >= _maxReconnectAttempts) return;
 
     _reconnectTimer?.cancel();
-    _reconnectTimer = Timer(_reconnectDelay, () {
+
+    // Exponential backoff
+    final delayMs = (_baseReconnectDelay.inMilliseconds *
+            (1 << _reconnectAttempts.clamp(0, 5)))
+        .clamp(_baseReconnectDelay.inMilliseconds, _maxReconnectDelay.inMilliseconds);
+
+    _reconnectTimer = Timer(Duration(milliseconds: delayMs), () {
       _reconnectAttempts++;
       if (_url != null) {
         connect(_url!, token: _token);
@@ -136,8 +211,13 @@ class WebSocketService {
   void _startHeartbeat() {
     _heartbeatTimer?.cancel();
     _heartbeatTimer = Timer.periodic(_heartbeatInterval, (_) {
-      emit('ping', {});
+      send('ping');
     });
+  }
+
+  /// Reset reconnection attempts
+  void resetReconnectAttempts() {
+    _reconnectAttempts = 0;
   }
 
   /// Dispose resources
@@ -149,3 +229,17 @@ class WebSocketService {
 
 /// Global WebSocket service instance
 final WebSocketService webSocketService = WebSocketService();
+
+/// WebSocket event types from Workers API
+class WebSocketEventTypes {
+  static const String connected = 'connected';
+  static const String ping = 'ping';
+  static const String pong = 'pong';
+  static const String subscribed = 'subscribed';
+  static const String unsubscribed = 'unsubscribed';
+  static const String nodeUpdate = 'node_update';
+  static const String taskUpdate = 'task_update';
+  static const String log = 'log';
+  static const String message = 'message';
+  static const String error = 'error';
+}
