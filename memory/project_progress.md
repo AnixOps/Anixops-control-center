@@ -7,18 +7,23 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.23`
+**Version**: `v2.0.0-rc.24`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.23
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.24
 
 ## Test Summary
 | Platform | Tests | Status |
 |----------|-------|--------|
-| Web Frontend | 83 | ✅ Passing |
+| Web Frontend | 92 | ✅ Passing |
 | Mobile App | 141 | ✅ Passing |
 | Workers API | 342 | ✅ Passing |
-| **Total** | **566** | ✅ |
+| **Total** | **575** | ✅ |
+
+## Recent Changes (v2.0.0-rc.24)
+- Add login.store.test.js with 9 tests
+- Add login form validation tests
+- Web: 92, Mobile: 141, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.23)
 - Add auth_provider_test.dart with 7 tests
