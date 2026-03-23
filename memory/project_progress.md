@@ -7,10 +7,16 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.13`
+**Version**: `v2.0.0-rc.14`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.13
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.14
+
+## Recent Changes (v2.0.0-rc.14)
+- Add tokens_provider_test.dart with model tests
+- Test ApiToken with expiry checks
+- Test Session model with device parsing
+- Flutter: 102 tests, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.13)
 - Add backup_provider_test.dart with model tests
