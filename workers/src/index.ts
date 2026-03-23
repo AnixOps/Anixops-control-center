@@ -19,6 +19,7 @@ import { listTasksHandler, getTaskHandler, createTaskHandler, cancelTaskHandler,
 import { listSchedulesHandler, getScheduleHandler, createScheduleHandler, updateScheduleHandler, deleteScheduleHandler, toggleScheduleHandler, runScheduleNowHandler } from './handlers/schedules'
 import { listNodeGroupsHandler, getNodeGroupHandler, createNodeGroupHandler, updateNodeGroupHandler, deleteNodeGroupHandler, addNodesToGroupHandler, removeNodesFromGroupHandler } from './handlers/node-groups'
 import { sseHandler, sseSubscribeHandler, sseUnsubscribeHandler, sseStatusHandler } from './handlers/sse'
+import { websocketHandler } from './handlers/websocket'
 import { createBackupHandler, listBackupsHandler, getBackupHandler, deleteBackupHandler, downloadBackupHandler, restoreBackupHandler, cleanupBackupsHandler, backupStatusHandler } from './handlers/backup'
 import {
   registerAgentHandler,
@@ -366,14 +367,8 @@ app.put('/api/v1/lb/:id/targets/:targetId/weight', authMiddleware, rbacMiddlewar
 app.post('/api/v1/lb/:id/targets/:targetId/complete', authMiddleware, recordCompletionHandler)
 
 // ==================== WebSocket ====================
-// WebSocket 暂时禁用 - Durable Object 有问题
-/*
-app.get('/api/v1/ws', async (c) => {
-  const id = c.env.WEBSOCKET_SERVER.idFromName('global')
-  const stub = c.env.WEBSOCKET_SERVER.get(id)
-  return stub.fetch(c.req.raw)
-})
-*/
+// WebSocket 实时通信端点
+app.get('/api/v1/ws', authMiddleware, websocketHandler)
 
 // ==================== 错误处理 ====================
 
@@ -395,88 +390,6 @@ app.onError((err, c) => {
 
   return c.json({ success: false, error: 'Internal Server Error' }, 500)
 })
-
-// ==================== Durable Object ====================
-// 暂时禁用以调试 Cloudflare 错误 1101
-/*
-export class WebSocketServer {
-  private state: DurableObjectState
-  private sessions: Map<WebSocket, { userId?: number }>
-
-  constructor(state: DurableObjectState) {
-    this.state = state
-    this.sessions = new Map()
-  }
-
-  async fetch(request: Request): Promise<Response> {
-    const url = new URL(request.url)
-
-    if (url.pathname === '/api/v1/ws') {
-      const { 0: client, 1: server } = new WebSocketPair()
-
-      this.handleSession(server)
-
-      return new Response(null, { status: 101, webSocket: client })
-    }
-
-    return new Response('Not Found', { status: 404 })
-  }
-
-  private handleSession(ws: WebSocket) {
-    ws.accept()
-    this.sessions.set(ws, {})
-
-    ws.addEventListener('message', async (event) => {
-      try {
-        const data = JSON.parse(event.data as string)
-        await this.handleMessage(ws, data)
-      } catch (err) {
-        ws.send(JSON.stringify({ error: 'Invalid message format' }))
-      }
-    })
-
-    ws.addEventListener('close', () => {
-      this.sessions.delete(ws)
-    })
-
-    ws.addEventListener('error', () => {
-      this.sessions.delete(ws)
-    })
-  }
-
-  private async handleMessage(ws: WebSocket, data: { type: string; payload?: unknown }) {
-    switch (data.type) {
-      case 'ping':
-        ws.send(JSON.stringify({ type: 'pong' }))
-        break
-
-      case 'subscribe':
-        // 订阅节点状态更新
-        ws.send(JSON.stringify({ type: 'subscribed', channel: data.payload }))
-        break
-
-      case 'unsubscribe':
-        // 取消订阅
-        ws.send(JSON.stringify({ type: 'unsubscribed', channel: data.payload }))
-        break
-
-      default:
-        ws.send(JSON.stringify({ error: 'Unknown message type' }))
-    }
-  }
-
-  // 广播消息给所有连接
-  broadcast(message: unknown) {
-    for (const [ws] of this.sessions) {
-      try {
-        ws.send(JSON.stringify(message))
-      } catch {
-        this.sessions.delete(ws)
-      }
-    }
-  }
-}
-*/
 
 // Export
 export default app
