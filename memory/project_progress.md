@@ -7,22 +7,26 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.18`
+**Version**: `v2.0.0-rc.19`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.18
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.19
 
 ## Test Summary
 | Platform | Tests | Status |
 |----------|-------|--------|
-| Web Frontend | 28 | ✅ Passing |
+| Web Frontend | 48 | ✅ Passing |
 | Mobile App | 102 | ✅ Passing |
 | Workers API | 342 | ✅ Passing |
-| **Total** | **472** | ✅ |
+| **Total** | **492** | ✅ |
+
+## Recent Changes (v2.0.0-rc.19)
+- Add schedules.store.test.js with 9 tests
+- Add notifications.store.test.js with 11 tests
+- Web: 48, Mobile: 102, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.18)
 - Add playbooks.store.test.js with 8 tests
-- Add Playbooks Store and Tasks Store tests
 - Web: 28, Mobile: 102, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.17)
