@@ -7,10 +7,16 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.11`
+**Version**: `v2.0.0-rc.12`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.11
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.12
+
+## Recent Changes (v2.0.0-rc.12)
+- Add backup_provider.dart for Flutter mobile
+- Add notifications_provider.dart with tests
+- Web: Notifications page and updated Sidebar
+- Flutter: 86 tests, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.11)
 - Add Notifications page for Web Frontend
