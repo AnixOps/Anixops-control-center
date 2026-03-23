@@ -9,24 +9,22 @@ type: project
 ## v2.1.x - Istio Service Mesh Integration
 
 ### Latest Release
-**Version**: `v2.1.0-rc.3`
+**Version**: `v2.1.0-rc.4`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.1.0-rc.3
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.1.0-rc.4
 
 ## Test Summary
 | Platform | Tests | Status |
 |----------|-------|--------|
-| Web Frontend | 160 | ✅ Passing |
+| Web Frontend | 183 | ✅ Passing |
 | Mobile App | 141 | ✅ Passing |
 | Workers API | 405 | ✅ Passing |
-| **Total** | **706** | ✅ |
+| **Total** | **729** | ✅ |
 
-## Recent Changes (v2.1.0-rc.3)
-- Add Monitoring.vue with health checks, metrics, alerts dashboard
-- Add Tracing.vue with distributed trace viewer and span details
-- Add monitoring.store.test.js with 15 tests
-- Web: 160, Mobile: 141, Workers: 405 tests
+## Recent Changes (v2.1.0-rc.4)
+- Add tracing.store.test.js with 23 tests for distributed tracing
+- Web: 183, Mobile: 141, Workers: 405 tests
 
 ## Recent Changes (v2.1.0-rc.1)
 - Add service discovery and registry
