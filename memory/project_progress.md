@@ -7,18 +7,23 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.17`
+**Version**: `v2.0.0-rc.18`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.17
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.18
 
 ## Test Summary
 | Platform | Tests | Status |
 |----------|-------|--------|
-| Web Frontend | 20 | ✅ Passing |
+| Web Frontend | 28 | ✅ Passing |
 | Mobile App | 102 | ✅ Passing |
 | Workers API | 342 | ✅ Passing |
-| **Total** | **464** | ✅ |
+| **Total** | **472** | ✅ |
+
+## Recent Changes (v2.0.0-rc.18)
+- Add playbooks.store.test.js with 8 tests
+- Add Playbooks Store and Tasks Store tests
+- Web: 28, Mobile: 102, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.17)
 - Add users.store.test.js with 10 tests
