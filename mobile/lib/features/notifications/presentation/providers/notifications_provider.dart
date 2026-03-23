@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/services/notifications_api.dart';
-import '../../core/providers/api_providers.dart';
+import '../../../../core/services/notifications_api.dart';
+import '../../../../core/providers/api_providers.dart';
 
 /// Notifications state
 class NotificationsState {
