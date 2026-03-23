@@ -7,18 +7,23 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.22`
+**Version**: `v2.0.0-rc.23`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.22
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.23
 
 ## Test Summary
 | Platform | Tests | Status |
 |----------|-------|--------|
 | Web Frontend | 83 | ✅ Passing |
-| Mobile App | 124 | ✅ Passing |
+| Mobile App | 141 | ✅ Passing |
 | Workers API | 342 | ✅ Passing |
-| **Total** | **549** | ✅ |
+| **Total** | **566** | ✅ |
+
+## Recent Changes (v2.0.0-rc.23)
+- Add auth_provider_test.dart with 7 tests
+- Add mfa_provider_test.dart with 10 tests
+- Web: 83, Mobile: 141, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.22)
 - Add playbooks_provider_test.dart with 10 tests
