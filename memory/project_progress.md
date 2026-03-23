@@ -7,10 +7,23 @@ type: project
 # AnixOps Workers API Progress
 
 ## Latest Release
-**Version**: `v2.0.0-rc.14`
+**Version**: `v2.0.0-rc.15`
 **Date**: 2026-03-23
 **Status**: ✅ Released
-**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.14
+**GitHub**: https://github.com/AnixOps/Anixops-control-center/releases/tag/v2.0.0-rc.15
+
+## Test Summary
+| Platform | Tests | Status |
+|----------|-------|--------|
+| Web Frontend | 5 | ✅ Passing |
+| Mobile App | 102 | ✅ Passing |
+| Workers API | 342 | ✅ Passing |
+| **Total** | **449** | ✅ |
+
+## Recent Changes (v2.0.0-rc.15)
+- Add web frontend testing with vitest
+- Add auth.store.test.js with 5 tests
+- Web: 5, Mobile: 102, Workers: 342 tests
 
 ## Recent Changes (v2.0.0-rc.14)
 - Add tokens_provider_test.dart with model tests
