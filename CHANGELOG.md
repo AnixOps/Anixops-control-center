@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Cloudflare Workers API moved to the standalone `anixops-control-center-workers` repository.
 - Development branch remains the place for post-v2.5.0 work.
-- RC builds before v2.5.0 final were treated as pre-releases only.
 
 ## [v2.5.0] - 2026-03-23
 

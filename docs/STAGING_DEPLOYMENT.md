@@ -90,10 +90,10 @@ wrangler secret put API_KEY_SALT --env production
 
 ```bash
 # 检查 Staging API 健康
-curl https://anixops-api-staging.<your-subdomain>.workers.dev/health
+curl https://<staging-api-base>/health
 
 # 检查 Production API 健康
-curl https://anixops-api-v2.kalijerry.workers.dev/health
+curl https://api.anixops.com/health
 ```
 
 ## 回滚

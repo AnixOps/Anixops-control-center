@@ -32,48 +32,9 @@ jobs:
           args: --timeout=5m
 
   # ============================================
-  # Workers TypeScript Tests
-  # ============================================
-  workers-test:
-    name: Workers Tests
-    runs-on: ubuntu-latest
-    outputs:
-      coverage: ${{ steps.coverage.outputs.coverage }}
-      tests: ${{ steps.coverage.outputs.tests }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: workers/package-lock.json
-
-      - name: Install dependencies
-        working-directory: workers
-        run: npm ci
-
-      - name: Run tests with coverage
-        id: coverage
-        working-directory: workers
-        run: |
-          npm test -- --coverage --run 2>&1 | tee test-output.txt
-          # Extract coverage from vitest output
-          COVERAGE=$(grep -oP 'All files\s+\K[\d.]+' test-output.txt || echo "85.25")
-          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
-          echo "Workers coverage: ${COVERAGE}%"
-
-      - name: Upload coverage
-        uses: codecov/codecov-action@v4
-        with:
-          files: ./workers/coverage/lcov.info
-          fail_ci_if_error: false
-          flags: workers
-
-  # ============================================
   # Unit Tests (Go)
   # ============================================
+
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -160,63 +121,40 @@ jobs:
   # ============================================
   dev-quality-gate:
     name: Dev Quality Gate (10%)
-    needs: [test, workers-test, lint]
+    needs: [test, lint]
     if: github.ref == 'refs/heads/dev' || startsWith(github.base_ref, 'dev')
     runs-on: ubuntu-latest
     steps:
       - name: Check coverage threshold
         run: |
           GO_COVERAGE=${{ needs.test.outputs.coverage }}
-          WORKERS_COVERAGE=${{ needs.workers-test.outputs.coverage }}
           echo "Go Coverage: ${GO_COVERAGE}%"
-          echo "Workers Coverage: ${WORKERS_COVERAGE}%"
 
-          # Use higher of the two coverages
-          if (( $(echo "$WORKERS_COVERAGE > $GO_COVERAGE" | bc -l) )); then
-            COVERAGE=$WORKERS_COVERAGE
-            echo "Using Workers coverage: ${COVERAGE}%"
-          else
-            COVERAGE=$GO_COVERAGE
-            echo "Using Go coverage: ${COVERAGE}%"
-          fi
-
-          if (( $(echo "$COVERAGE < 10" | bc -l) )); then
-            echo "::error::Coverage ${COVERAGE}% is below 10% threshold for dev branch"
+          if (( $(echo "$GO_COVERAGE < 10" | bc -l) )); then
+            echo "::error::Coverage ${GO_COVERAGE}% is below 10% threshold for dev branch"
             exit 1
           fi
-          echo "✅ Dev quality gate passed (coverage: ${COVERAGE}%)"
+          echo "✅ Dev quality gate passed (coverage: ${GO_COVERAGE}%)"
 
   # ============================================
   # Production Branch Quality Gate (60% combined coverage + critical 100%)
   # ============================================
   production-quality-gate:
     name: Production Quality Gate (60% + Critical 100%)
-    needs: [test, workers-test, critical-tests, lint]
+    needs: [test, critical-tests, lint]
     if: github.ref == 'refs/heads/production' || startsWith(github.base_ref, 'production') || startsWith(github.ref, 'refs/heads/v')
     runs-on: ubuntu-latest
     steps:
       - name: Check coverage threshold
         run: |
           GO_COVERAGE=${{ needs.test.outputs.coverage }}
-          WORKERS_COVERAGE=${{ needs.workers-test.outputs.coverage }}
           CRITICAL=${{ needs.critical-tests.outputs.passed }}
 
           echo "Go Coverage: ${GO_COVERAGE}%"
-          echo "Workers Coverage: ${WORKERS_COVERAGE}%"
           echo "Critical tests: ${CRITICAL}"
 
-          # Use higher of the two coverages (Workers is the primary API)
-          if (( $(echo "$WORKERS_COVERAGE > $GO_COVERAGE" | bc -l) )); then
-            COVERAGE=$WORKERS_COVERAGE
-            echo "Using Workers coverage as primary: ${COVERAGE}%"
-          else
-            COVERAGE=$GO_COVERAGE
-            echo "Using Go coverage as primary: ${COVERAGE}%"
-          fi
-
-          # Production requires 60% coverage (Workers has 85%)
-          if (( $(echo "$COVERAGE < 60" | bc -l) )); then
-            echo "::error::Coverage ${COVERAGE}% is below 60% threshold for production branch"
+          if (( $(echo "$GO_COVERAGE < 60" | bc -l) )); then
+            echo "::error::Coverage ${GO_COVERAGE}% is below 60% threshold for production branch"
             exit 1
           fi
 
@@ -225,7 +163,7 @@ jobs:
             exit 1
           fi
 
-          echo "✅ Production quality gate passed (coverage: ${COVERAGE}%, critical: 100%)"
+          echo "✅ Production quality gate passed (coverage: ${GO_COVERAGE}%, critical: 100%)"
 
   # ============================================
   # Build All Platforms
