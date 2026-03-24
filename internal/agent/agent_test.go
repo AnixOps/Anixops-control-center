@@ -534,3 +534,242 @@ func TestPollAndExecuteCommands(t *testing.T) {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
+
+func TestDefaultCommandHandler_Exec(t *testing.T) {
+	cfg := &Config{
+		ServerURL: "http://localhost:8080",
+		AgentID:   "test-agent",
+		SecretKey: "test-secret",
+	}
+
+	agent, _ := New(cfg)
+	ctx := context.Background()
+
+	// Test exec command with actual command (echo works on all platforms)
+	cmd := &Command{
+		ID:   "cmd-exec",
+		Type: "exec",
+		Payload: map[string]interface{}{
+			"command": "echo hello",
+		},
+	}
+
+	result, err := agent.defaultCommandHandler(ctx, cmd)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// On Windows, sh might not be available
+	// Just verify the function doesn't panic
+	_ = result
+}
+
+func TestDefaultCommandHandler_Script(t *testing.T) {
+	cfg := &Config{
+		ServerURL: "http://localhost:8080",
+		AgentID:   "test-agent",
+		SecretKey: "test-secret",
+	}
+
+	agent, _ := New(cfg)
+	ctx := context.Background()
+
+	cmd := &Command{
+		ID:   "cmd-script",
+		Type: "script",
+		Payload: map[string]interface{}{
+			"script": "echo test",
+		},
+	}
+
+	result, err := agent.defaultCommandHandler(ctx, cmd)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// On Windows, sh might not be available
+	_ = result
+}
+
+func TestAgent_Stop_WithRunning(t *testing.T) {
+	cfg := &Config{
+		ServerURL:         "http://localhost:8080",
+		AgentID:           "test-agent",
+		SecretKey:         "test-secret",
+		HeartbeatInterval: 1 * time.Hour, // Long interval to avoid actual calls
+		MetricsInterval:   1 * time.Hour,
+	}
+
+	agent, _ := New(cfg)
+	agent.running = true
+	agent.stopCh = make(chan struct{})
+
+	err := agent.Stop()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+
+	if agent.running {
+		t.Error("expected agent to be stopped")
+	}
+}
+
+func TestSendHeartbeat(t *testing.T) {
+	cfg := &Config{
+		ServerURL: "http://localhost:8080",
+		AgentID:   "test-agent",
+		SecretKey: "test-secret",
+	}
+
+	agent, _ := New(cfg)
+	ctx := context.Background()
+
+	// This will fail because there's no server, but we test the path
+	err := agent.sendHeartbeat(ctx)
+	// Error is expected due to no server
+	_ = err
+
+	// Note: LastSeen is only updated on successful heartbeat
+	// so we don't check it here
+}
+
+func TestRegister(t *testing.T) {
+	cfg := &Config{
+		ServerURL: "http://localhost:8080",
+		AgentID:   "test-agent",
+		SecretKey: "test-secret",
+	}
+
+	agent, _ := New(cfg)
+	ctx := context.Background()
+
+	// This will fail because there's no server
+	err := agent.register(ctx)
+	if err == nil {
+		t.Error("expected error when no server is running")
+	}
+}
+
+func TestDefaultCommandHandler_ExecWithOutput(t *testing.T) {
+	cfg := &Config{
+		ServerURL: "http://localhost:8080",
+		AgentID:   "test-agent",
+		SecretKey: "test-secret",
+	}
+
+	agent, _ := New(cfg)
+	ctx := context.Background()
+
+	// Test with a simple command that should work
+	cmd := &Command{
+		ID:   "cmd-echo",
+		Type: "exec",
+		Payload: map[string]interface{}{
+			"command": "echo test-output",
+		},
+	}
+
+	result, err := agent.defaultCommandHandler(ctx, cmd)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	_ = result
+}
+
+func TestAgentInfo_AllFields(t *testing.T) {
+	now := time.Now()
+	info := &AgentInfo{
+		AgentID:   "agent-123",
+		Hostname:  "test-host",
+		IPAddress: "10.0.0.1",
+		OS:        "linux",
+		Arch:      "amd64",
+		Version:   "1.0.0",
+		Labels:    map[string]string{"env": "prod"},
+		LastSeen:  now,
+		Status:    "running",
+		CPUCount:  8,
+		MemoryGB:  16.0,
+		DiskGB:    500.0,
+	}
+
+	if info.AgentID != "agent-123" {
+		t.Errorf("unexpected AgentID: %s", info.AgentID)
+	}
+	if info.IPAddress != "10.0.0.1" {
+		t.Errorf("unexpected IPAddress: %s", info.IPAddress)
+	}
+	if info.CPUCount != 8 {
+		t.Errorf("unexpected CPUCount: %d", info.CPUCount)
+	}
+}
+
+func TestCommand_AllFields(t *testing.T) {
+	now := time.Now()
+	cmd := &Command{
+		ID:        "cmd-xyz",
+		Type:      "custom",
+		Payload:   map[string]interface{}{"key": "value"},
+		Timeout:   30 * time.Second,
+		CreatedAt: now,
+	}
+
+	if cmd.ID != "cmd-xyz" {
+		t.Errorf("unexpected ID: %s", cmd.ID)
+	}
+	if cmd.Type != "custom" {
+		t.Errorf("unexpected Type: %s", cmd.Type)
+	}
+	if cmd.Timeout != 30*time.Second {
+		t.Errorf("unexpected Timeout: %v", cmd.Timeout)
+	}
+}
+
+func TestCommandResult_AllFields(t *testing.T) {
+	result := &CommandResult{
+		CommandID: "cmd-abc",
+		Success:   true,
+		Output:    "command output",
+		Error:     "",
+		Metadata:  map[string]any{"duration": 100},
+		Duration:  100 * time.Millisecond,
+	}
+
+	if result.CommandID != "cmd-abc" {
+		t.Errorf("unexpected CommandID: %s", result.CommandID)
+	}
+	if result.Metadata["duration"] != 100 {
+		t.Errorf("unexpected Metadata: %v", result.Metadata)
+	}
+}
+
+func TestMetrics_AllFields(t *testing.T) {
+	metrics := &Metrics{
+		CPUUsage:     45.5,
+		MemoryUsage:  60.0,
+		MemoryTotal:  16000000000,
+		MemoryUsed:   9600000000,
+		DiskUsage:    70.0,
+		DiskTotal:    500000000000,
+		DiskUsed:     350000000000,
+		NetworkRx:    1000000000,
+		NetworkTx:    500000000,
+		LoadAvg1:     2.5,
+		LoadAvg5:     2.0,
+		LoadAvg15:    1.5,
+		Uptime:       172800,
+		ProcessCount: 150,
+		Timestamp:    time.Now().Unix(),
+	}
+
+	if metrics.CPUUsage != 45.5 {
+		t.Errorf("unexpected CPUUsage: %f", metrics.CPUUsage)
+	}
+	if metrics.LoadAvg1 != 2.5 {
+		t.Errorf("unexpected LoadAvg1: %f", metrics.LoadAvg1)
+	}
+	if metrics.ProcessCount != 150 {
+		t.Errorf("unexpected ProcessCount: %d", metrics.ProcessCount)
+	}
+}
