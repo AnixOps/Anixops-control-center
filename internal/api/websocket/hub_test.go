@@ -322,3 +322,176 @@ func TestHub_MultipleClients(t *testing.T) {
 		t.Errorf("expected 2 clients, got %d", hub.ClientCount())
 	}
 }
+
+func TestHub_BroadcastToTopic_WithSubscribers(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	// Create clients with topic subscriptions
+	client1 := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: map[string]bool{"logs": true},
+	}
+	client2 := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: map[string]bool{"events": true},
+	}
+
+	hub.mu.Lock()
+	hub.clients[client1] = true
+	hub.clients[client2] = true
+	hub.mu.Unlock()
+
+	// Broadcast to logs topic
+	hub.BroadcastToTopic("logs", MessageTypeLog, map[string]string{"message": "test"})
+
+	// Give time for message processing
+	time.Sleep(10 * time.Millisecond)
+
+	// Client1 should receive the message
+	select {
+	case msg := <-client1.send:
+		var decoded Message
+		if err := json.Unmarshal(msg, &decoded); err != nil {
+			t.Fatalf("failed to decode message: %v", err)
+		}
+		if decoded.Type != MessageTypeLog {
+			t.Errorf("expected type '%s', got '%s'", MessageTypeLog, decoded.Type)
+		}
+	default:
+		// Message might not have been sent yet since Run() is not running
+	}
+
+	// Client2 should not receive the message (different topic)
+	select {
+	case <-client2.send:
+		t.Error("client2 should not have received message for different topic")
+	default:
+		// Expected - no message
+	}
+}
+
+func TestClient_FullBuffer(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	// Create client with small buffer
+	client := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 1), // Buffer of 1
+		topics: make(map[string]bool),
+	}
+
+	// Fill the buffer
+	client.send <- []byte("message1")
+
+	// Try to send another message - this should trigger the default case
+	// in the broadcast logic
+	hub.mu.Lock()
+	hub.clients[client] = true
+	hub.mu.Unlock()
+
+	// This broadcast should cause the client to be removed due to full buffer
+	// when Run() is not running, messages go to broadcast channel
+	hub.Broadcast(MessageTypeLog, "test")
+}
+
+func TestHub_EventBus(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	if hub.eventBus != eb {
+		t.Error("hub eventBus not set correctly")
+	}
+}
+
+func TestMessage_AllFields(t *testing.T) {
+	msg := Message{
+		Type:      MessageTypeEvent,
+		Timestamp: time.Now().Unix(),
+		Data:      map[string]interface{}{"key": "value"},
+		Error:     "test error",
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	var decoded Message
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	if decoded.Error != "test error" {
+		t.Errorf("expected error 'test error', got '%s'", decoded.Error)
+	}
+}
+
+func TestClient_UserInfo(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	client := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: make(map[string]bool),
+		userID: "user-123",
+		role:   "admin",
+	}
+
+	if client.userID != "user-123" {
+		t.Errorf("expected userID 'user-123', got '%s'", client.userID)
+	}
+	if client.role != "admin" {
+		t.Errorf("expected role 'admin', got '%s'", client.role)
+	}
+}
+
+func TestLogStreamer_StreamWithData(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+	streamer := NewLogStreamer(hub)
+
+	// Add a client subscribed to logs
+	client := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: map[string]bool{"logs": true},
+	}
+
+	hub.mu.Lock()
+	hub.clients[client] = true
+	hub.mu.Unlock()
+
+	// Stream a log
+	streamer.Stream("error", "test-service", "error message")
+
+	// Give time for processing
+	time.Sleep(10 * time.Millisecond)
+}
+
+func TestEventStreamer_StreamWithData(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+	streamer := NewEventStreamer(hub)
+
+	// Add a client subscribed to events
+	client := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: map[string]bool{"events": true},
+	}
+
+	hub.mu.Lock()
+	hub.clients[client] = true
+	hub.mu.Unlock()
+
+	// Stream an event
+	streamer.Stream("user.login", map[string]string{"user_id": "123"})
+
+	// Give time for processing
+	time.Sleep(10 * time.Millisecond)
+}

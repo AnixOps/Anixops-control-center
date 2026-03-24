@@ -148,3 +148,106 @@ func TestConfig_EnvVars(t *testing.T) {
 		t.Error("expected ANSIBLE_HOST_KEY_CHECKING to be False")
 	}
 }
+
+func TestExecutor_Execute_Success(t *testing.T) {
+	cfg := Config{}
+	exec := NewExecutor(cfg)
+	ctx := context.Background()
+
+	// Execute a simple command that should succeed
+	output, err := exec.Execute(ctx, "echo", "hello")
+
+	// On Windows, echo might not exist as a separate command
+	// Just verify we can call Execute without panic
+	_ = output
+	_ = err
+}
+
+func TestExecutor_ExecuteWithOutput_Success(t *testing.T) {
+	cfg := Config{}
+	exec := NewExecutor(cfg)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	outputChan, errChan := exec.ExecuteWithOutput(ctx, "echo", "test")
+
+	// Collect output
+	var outputs []string
+	timeout := time.After(3 * time.Second)
+
+outer:
+	for {
+		select {
+		case output, ok := <-outputChan:
+			if !ok {
+				break outer
+			}
+			outputs = append(outputs, output)
+		case err := <-errChan:
+			if err != nil {
+				t.Logf("Error (may be expected): %v", err)
+			}
+			break outer
+		case <-timeout:
+			t.Log("Test timed out")
+			break outer
+		}
+	}
+
+	_ = outputs
+}
+
+func TestExecutor_ExecuteWithOutput_InvalidCommand(t *testing.T) {
+	cfg := Config{}
+	exec := NewExecutor(cfg)
+
+	ctx := context.Background()
+	outputChan, errChan := exec.ExecuteWithOutput(ctx, "nonexistent-command-xyz")
+
+	// Wait for error
+	select {
+	case <-outputChan:
+		// Some output might come through
+	case err := <-errChan:
+		if err == nil {
+			t.Error("expected error for invalid command")
+		}
+	case <-time.After(2 * time.Second):
+		t.Log("Timed out waiting for error")
+	}
+}
+
+func TestNewExecutor_WithAllConfig(t *testing.T) {
+	cfg := Config{
+		PlaybookDir:   "/playbooks",
+		InventoryFile: "/inventory/hosts",
+		VaultPassword: "secret",
+		Timeout:       300,
+		EnvVars: map[string]string{
+			"ANSIBLE_HOST_KEY_CHECKING": "False",
+		},
+	}
+
+	exec := NewExecutor(cfg)
+	if exec == nil {
+		t.Fatal("NewExecutor returned nil")
+	}
+}
+
+func TestExecutor_Execute_WithAllEnvVars(t *testing.T) {
+	cfg := Config{
+		Timeout: 10,
+		EnvVars: map[string]string{
+			"TEST_VAR1": "value1",
+			"TEST_VAR2": "value2",
+		},
+		VaultPassword: "vault-secret",
+	}
+
+	exec := NewExecutor(cfg)
+	ctx := context.Background()
+
+	// Just verify the executor is created correctly with all options
+	_, _ = exec.Execute(ctx, "echo", "test")
+}

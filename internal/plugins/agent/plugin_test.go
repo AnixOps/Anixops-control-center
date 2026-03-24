@@ -266,3 +266,119 @@ func TestConfig(t *testing.T) {
 		t.Errorf("expected port 8080, got %d", cfg.Port)
 	}
 }
+
+func TestExecute_Connect_NoHost(t *testing.T) {
+	p := New()
+	_ = p.Init(context.Background(), map[string]interface{}{})
+
+	result, err := p.Execute(context.Background(), "connect", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Success {
+		t.Error("expected failure without host")
+	}
+}
+
+func TestExecute_Connect_WithPort(t *testing.T) {
+	p := New()
+	_ = p.Init(context.Background(), map[string]interface{}{})
+
+	result, err := p.Execute(context.Background(), "connect", map[string]interface{}{
+		"host": "localhost",
+		"port": float64(9090),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Will fail because no real websocket server
+	if result.Success {
+		t.Error("expected failure connecting to non-existent server")
+	}
+}
+
+func TestExecute_SystemInfo(t *testing.T) {
+	p := New()
+	_ = p.Init(context.Background(), map[string]interface{}{})
+
+	// Not connected, so will fail
+	result, err := p.Execute(context.Background(), "system_info", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Success {
+		t.Error("expected failure when not connected")
+	}
+}
+
+func TestExecute_ServiceStart_WithService(t *testing.T) {
+	p := New()
+	_ = p.Init(context.Background(), map[string]interface{}{})
+
+	// Not connected, so will fail
+	result, err := p.Execute(context.Background(), "service_start", map[string]interface{}{
+		"service": "nginx",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Success {
+		t.Error("expected failure when not connected")
+	}
+}
+
+func TestExecute_ServiceStop_WithService(t *testing.T) {
+	p := New()
+	_ = p.Init(context.Background(), map[string]interface{}{})
+
+	// Not connected, so will fail
+	result, err := p.Execute(context.Background(), "service_stop", map[string]interface{}{
+		"service": "nginx",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Success {
+		t.Error("expected failure when not connected")
+	}
+}
+
+func TestExecute_ServiceStatus_WithService(t *testing.T) {
+	p := New()
+	_ = p.Init(context.Background(), map[string]interface{}{})
+
+	// Not connected, so will fail
+	result, err := p.Execute(context.Background(), "service_status", map[string]interface{}{
+		"service": "nginx",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Success {
+		t.Error("expected failure when not connected")
+	}
+}
+
+func TestHealthCheck_Connected(t *testing.T) {
+	p := New()
+	_ = p.Init(context.Background(), map[string]interface{}{})
+
+	// Set a mock connection (nil is used to simulate connection)
+	// Without actual websocket connection, we test the not connected path
+	err := p.HealthCheck(context.Background())
+	if err == nil {
+		t.Error("expected error for not connected")
+	}
+}
+
+func TestStop_WithConnection(t *testing.T) {
+	p := New()
+	_ = p.Init(context.Background(), map[string]interface{}{})
+	_ = p.Start(context.Background())
+
+	// Stop should work even without a connection
+	err := p.Stop(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

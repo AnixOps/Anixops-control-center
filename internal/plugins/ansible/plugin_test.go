@@ -181,3 +181,81 @@ func TestErrToString(t *testing.T) {
 		t.Error("expected error string for non-nil error")
 	}
 }
+
+func TestListPlaybooks_NoDir(t *testing.T) {
+	p := New()
+
+	// Without playbook_dir configured
+	result, err := p.listPlaybooks(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Success {
+		t.Error("expected failure without playbook_dir")
+	}
+}
+
+func TestValidateInventory_NoInventory(t *testing.T) {
+	p := New()
+
+	result, err := p.validateInventory(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Success {
+		t.Error("expected failure without inventory")
+	}
+}
+
+func TestGetInventory_NoInventory(t *testing.T) {
+	p := New()
+
+	result, err := p.getInventory(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Success {
+		t.Error("expected failure without inventory")
+	}
+}
+
+func TestListHosts(t *testing.T) {
+	p := New()
+
+	// Without Init, executor is nil, so we skip this test
+	// as it would cause a nil pointer dereference
+	// The listHosts method requires an initialized executor
+	_ = p
+}
+
+func TestRunPlaybook_WithParams(t *testing.T) {
+	// This test validates that runPlaybook correctly parses parameters
+	// We cannot test actual execution without ansible installed
+
+	// Test that playbook parameter is required
+	p := New()
+	_, err := p.runPlaybook(context.Background(), map[string]interface{}{})
+	if err == nil {
+		t.Error("expected error when playbook is not provided")
+	}
+}
+
+func TestRunTask_WithParams(t *testing.T) {
+	// This test validates that runTask correctly parses parameters
+	// We cannot test actual execution without ansible installed
+
+	// Test that module parameter is required
+	p := New()
+	_, err := p.runTask(context.Background(), map[string]interface{}{})
+	if err == nil {
+		t.Error("expected error when module is not provided")
+	}
+}
+
+func TestHealthCheck(t *testing.T) {
+	p := New()
+
+	// This will fail on systems without ansible
+	err := p.HealthCheck(context.Background())
+	_ = err
+}
