@@ -11,8 +11,8 @@ import (
 // collectHostInfo collects information about the host system (stub for non-Linux)
 func (a *Agent) collectHostInfo() error {
 	a.info.CPUCount = runtime.NumCPU()
-	a.info.MemoryGB = 8.0  // Default
-	a.info.DiskGB = 100.0  // Default
+	a.info.MemoryGB = 8.0 // Default
+	a.info.DiskGB = 100.0 // Default
 	return nil
 }
 

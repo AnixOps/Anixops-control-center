@@ -34,11 +34,11 @@ func TestInit(t *testing.T) {
 	config := map[string]interface{}{
 		"hosts": []interface{}{
 			map[string]interface{}{
-				"id":       1,
-				"name":     "node1",
-				"host":     "localhost",
-				"port":     8080,
-				"api_key":  "test-key",
+				"id":        1,
+				"name":      "node1",
+				"host":      "localhost",
+				"port":      8080,
+				"api_key":   "test-key",
 				"grpc_port": 50051,
 			},
 		},

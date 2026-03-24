@@ -368,11 +368,11 @@ func TestExecute_GetStats_WithNodeID(t *testing.T) {
 		"host": "http://localhost",
 		"hosts": []interface{}{
 			map[string]interface{}{
-				"id":       1,
-				"name":     "node1",
-				"host":     "localhost",
-				"port":     9999,
-				"api_key":  "test",
+				"id":      1,
+				"name":    "node1",
+				"host":    "localhost",
+				"port":    9999,
+				"api_key": "test",
 			},
 		},
 	})
