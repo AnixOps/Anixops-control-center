@@ -371,3 +371,187 @@ func TestExecutablePlugin(t *testing.T) {
 		t.Error("expected success")
 	}
 }
+
+// TestInitPlugin tests initializing a specific plugin
+func TestInitPlugin(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("success", func(t *testing.T) {
+		mgr := plugin.NewManager()
+		p := &MockPlugin{info: plugin.PluginInfo{Name: "test"}}
+		mgr.Register("test", p)
+		mgr.SetConfig("test", map[string]interface{}{"key": "value"})
+
+		err := mgr.InitPlugin(ctx, "test")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		state := mgr.GetState("test")
+		if state != plugin.StateInitialized {
+			t.Errorf("expected state %s, got %s", plugin.StateInitialized, state)
+		}
+	})
+
+	t.Run("not_found", func(t *testing.T) {
+		mgr := plugin.NewManager()
+
+		err := mgr.InitPlugin(ctx, "nonexistent")
+		if err == nil {
+			t.Fatal("expected error for nonexistent plugin")
+		}
+	})
+
+	t.Run("init_error", func(t *testing.T) {
+		mgr := plugin.NewManager()
+		p := &MockPlugin{
+			info:    plugin.PluginInfo{Name: "test"},
+			initErr: errors.New("init failed"),
+		}
+		mgr.Register("test", p)
+
+		err := mgr.InitPlugin(ctx, "test")
+		if err == nil {
+			t.Fatal("expected error for init failure")
+		}
+
+		state := mgr.GetState("test")
+		if state != plugin.StateError {
+			t.Errorf("expected state %s, got %s", plugin.StateError, state)
+		}
+	})
+}
+
+// TestUnregisterRunning tests unregistering a running plugin
+func TestUnregisterRunning(t *testing.T) {
+	ctx := context.Background()
+	mgr := plugin.NewManager()
+
+	p := &MockPlugin{
+		info: plugin.PluginInfo{Name: "test"},
+	}
+	mgr.Register("test", p)
+	mgr.StartPlugin(ctx, "test")
+
+	// Unregister should stop the plugin first
+	err := mgr.Unregister("test")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	_, ok := mgr.Get("test")
+	if ok {
+		t.Fatal("expected plugin to be unregistered")
+	}
+}
+
+// TestStopPluginError tests stopping a plugin with error
+func TestStopPluginError(t *testing.T) {
+	ctx := context.Background()
+	mgr := plugin.NewManager()
+
+	p := &MockPlugin{
+		info:    plugin.PluginInfo{Name: "test"},
+		stopErr: errors.New("stop failed"),
+	}
+	mgr.Register("test", p)
+	mgr.StartPlugin(ctx, "test")
+
+	err := mgr.StopPlugin(ctx, "test")
+	if err == nil {
+		t.Fatal("expected error for stop failure")
+	}
+
+	state := mgr.GetState("test")
+	if state != plugin.StateError {
+		t.Errorf("expected state %s, got %s", plugin.StateError, state)
+	}
+}
+
+// TestStopAllWithError tests stopping all plugins with one error
+func TestStopAllWithError(t *testing.T) {
+	ctx := context.Background()
+	mgr := plugin.NewManager()
+
+	p1 := &MockPlugin{info: plugin.PluginInfo{Name: "plugin1"}}
+	p2 := &MockPlugin{
+		info:    plugin.PluginInfo{Name: "plugin2"},
+		stopErr: errors.New("stop failed"),
+	}
+
+	mgr.Register("plugin1", p1)
+	mgr.Register("plugin2", p2)
+	mgr.StartAll(ctx)
+
+	err := mgr.StopAll(ctx)
+	if err == nil {
+		t.Fatal("expected error for stop failure")
+	}
+}
+
+// TestInitAllError tests initializing all plugins with error
+func TestInitAllError(t *testing.T) {
+	ctx := context.Background()
+	mgr := plugin.NewManager()
+
+	p1 := &MockPlugin{info: plugin.PluginInfo{Name: "plugin1"}}
+	p2 := &MockPlugin{
+		info:    plugin.PluginInfo{Name: "plugin2"},
+		initErr: errors.New("init failed"),
+	}
+
+	mgr.Register("plugin1", p1)
+	mgr.Register("plugin2", p2)
+
+	err := mgr.InitAll(ctx)
+	if err == nil {
+		t.Fatal("expected error for init failure")
+	}
+}
+
+// TestStartAllError tests starting all plugins with error
+func TestStartAllError(t *testing.T) {
+	ctx := context.Background()
+	mgr := plugin.NewManager()
+
+	p1 := &MockPlugin{info: plugin.PluginInfo{Name: "plugin1"}}
+	p2 := &MockPlugin{
+		info:     plugin.PluginInfo{Name: "plugin2"},
+		startErr: errors.New("start failed"),
+	}
+
+	mgr.Register("plugin1", p1)
+	mgr.Register("plugin2", p2)
+
+	err := mgr.StartAll(ctx)
+	if err == nil {
+		t.Fatal("expected error for start failure")
+	}
+}
+
+// TestSetConfig tests setting config
+func TestSetConfig(t *testing.T) {
+	mgr := plugin.NewManager()
+	config := map[string]interface{}{"key": "value"}
+
+	mgr.SetConfig("test", config)
+
+	retrieved := mgr.GetConfig("test")
+	if retrieved == nil {
+		t.Fatal("expected config to be set")
+	}
+	if retrieved["key"] != "value" {
+		t.Errorf("expected key 'value', got '%v'", retrieved["key"])
+	}
+}
+
+// TestStopPluginNotFound tests stopping a nonexistent plugin
+func TestStopPluginNotFound(t *testing.T) {
+	ctx := context.Background()
+	mgr := plugin.NewManager()
+
+	err := mgr.StopPlugin(ctx, "nonexistent")
+	if err == nil {
+		t.Fatal("expected error for nonexistent plugin")
+	}
+}
