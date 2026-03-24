@@ -56,8 +56,12 @@ import {
   UsersIcon,
   DocumentTextIcon,
   ClipboardDocumentListIcon,
+  CalendarIcon,
+  BellIcon,
   Cog6ToothIcon,
-  ArrowRightOnRectangleIcon
+  ArrowRightOnRectangleIcon,
+  SparklesIcon,
+  CubeIcon
 } from '@heroicons/vue/24/outline'
 
 const route = useRoute()
@@ -70,7 +74,12 @@ const menuItems = [
   { name: 'Agents', path: '/agents', icon: ComputerDesktopIcon },
   { name: 'Users', path: '/users', icon: UsersIcon },
   { name: 'Playbooks', path: '/playbooks', icon: DocumentTextIcon },
+  { name: 'Tasks', path: '/tasks', icon: ClipboardDocumentListIcon },
+  { name: 'Schedules', path: '/schedules', icon: CalendarIcon },
   { name: 'Logs', path: '/logs', icon: ClipboardDocumentListIcon },
+  { name: 'Notifications', path: '/notifications', icon: BellIcon },
+  { name: 'AI Assistant', path: '/ai', icon: SparklesIcon },
+  { name: 'Web3', path: '/web3', icon: CubeIcon },
   { name: 'Settings', path: '/settings', icon: Cog6ToothIcon }
 ]
 

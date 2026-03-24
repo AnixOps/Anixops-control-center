@@ -13,6 +13,13 @@ import '../../features/users/presentation/pages/users_page.dart';
 import '../../features/logs/presentation/pages/logs_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
+import '../../features/playbooks/presentation/pages/playbooks_page.dart';
+import '../../features/playbooks/presentation/pages/playbook_detail_page.dart';
+import '../../features/tasks/presentation/pages/tasks_page.dart';
+import '../../features/tasks/presentation/pages/task_detail_page.dart';
+import '../../features/schedules/presentation/pages/schedules_page.dart';
+import '../../features/ai/presentation/pages/ai_assistant_page.dart';
+import '../../features/web3/presentation/pages/web3_dashboard_page.dart';
 
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../shared/presentation/pages/main_shell.dart';
@@ -65,9 +72,43 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const NodesPage(),
           ),
           GoRoute(
+            path: '/nodes/:id',
+            name: 'node-detail',
+            builder: (context, state) {
+              final id = state.pathParameters['id']!;
+              return NodeDetailPage(nodeId: id);
+            },
+          ),
+          GoRoute(
             path: '/playbooks',
             name: 'playbooks',
             builder: (context, state) => const PlaybooksPage(),
+          ),
+          GoRoute(
+            path: '/playbooks/:name',
+            name: 'playbook-detail',
+            builder: (context, state) {
+              final name = state.pathParameters['name']!;
+              return PlaybookDetailPage(playbookName: name);
+            },
+          ),
+          GoRoute(
+            path: '/tasks',
+            name: 'tasks',
+            builder: (context, state) => const TasksPage(),
+          ),
+          GoRoute(
+            path: '/tasks/:id',
+            name: 'task-detail',
+            builder: (context, state) {
+              final id = state.pathParameters['id']!;
+              return TaskDetailPage(taskId: id);
+            },
+          ),
+          GoRoute(
+            path: '/schedules',
+            name: 'schedules',
+            builder: (context, state) => const SchedulesPage(),
           ),
           GoRoute(
             path: '/plugins',
@@ -93,6 +134,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/notifications',
             name: 'notifications',
             builder: (context, state) => const NotificationsPage(),
+          ),
+          GoRoute(
+            path: '/ai',
+            name: 'ai',
+            builder: (context, state) => const AIAssistantPage(),
+          ),
+          GoRoute(
+            path: '/web3',
+            name: 'web3',
+            builder: (context, state) => const Web3DashboardPage(),
           ),
         ],
       ),
@@ -145,28 +196,4 @@ class ErrorPage extends StatelessWidget {
   }
 }
 
-/// Placeholder for PlaybooksPage
-class PlaybooksPage extends StatelessWidget {
-  const PlaybooksPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.play_circle_outline, size: 64),
-            const SizedBox(height: 16),
-            Text(
-              'Playbooks',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 8),
-            const Text('Ansible playbook management'),
-          ],
-        ),
-      ),
-    );
-  }
-}
+/// Placeholder for PlaybooksPage - now imported from features/playbooks

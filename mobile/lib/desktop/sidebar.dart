@@ -230,6 +230,8 @@ class DesktopSidebar extends ConsumerWidget {
       _NavItemData(Icons.dashboard_rounded, 'Dashboard', '/dashboard'),
       _NavItemData(Icons.dns_rounded, 'Nodes', '/nodes'),
       _NavItemData(Icons.play_circle_rounded, 'Playbooks', '/playbooks'),
+      _NavItemData(Icons.task_rounded, 'Tasks', '/tasks'),
+      _NavItemData(Icons.schedule_rounded, 'Schedules', '/schedules'),
       _NavItemData(Icons.extension_rounded, 'Plugins', '/plugins'),
     ];
 
@@ -241,6 +243,8 @@ class DesktopSidebar extends ConsumerWidget {
     // Items available to all users
     items.addAll([
       _NavItemData(Icons.description_rounded, 'Logs', '/logs'),
+      _NavItemData(Icons.psychology_rounded, 'AI Assistant', '/ai'),
+      _NavItemData(Icons.token_rounded, 'Web3', '/web3'),
       _NavItemData(Icons.notifications_rounded, 'Notifications', '/notifications'),
       _NavItemData(Icons.settings_rounded, 'Settings', '/settings'),
     ]);

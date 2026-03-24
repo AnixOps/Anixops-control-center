@@ -151,15 +151,22 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             Expanded(
               child: _QuickActionButton(
                 icon: Icons.play_circle_outline,
-                label: 'Plugins',
-                onTap: () => context.go('/plugins'),
+                label: 'Playbooks',
+                onTap: () => context.go('/playbooks'),
               ),
             ),
             Expanded(
               child: _QuickActionButton(
-                icon: Icons.person_add_outlined,
-                label: 'Users',
-                onTap: () => context.go('/users'),
+                icon: Icons.task_outlined,
+                label: 'Tasks',
+                onTap: () => context.go('/tasks'),
+              ),
+            ),
+            Expanded(
+              child: _QuickActionButton(
+                icon: Icons.schedule_outlined,
+                label: 'Schedules',
+                onTap: () => context.go('/schedules'),
               ),
             ),
           ],

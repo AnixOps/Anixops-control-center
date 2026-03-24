@@ -4,6 +4,14 @@ import 'package:anixops_mobile/core/services/nodes_api.dart';
 import 'package:anixops_mobile/core/services/users_api.dart';
 import 'package:anixops_mobile/core/services/plugins_api.dart';
 import 'package:anixops_mobile/core/services/ssh_api.dart';
+import 'package:anixops_mobile/core/services/playbooks_api.dart';
+import 'package:anixops_mobile/core/services/tasks_api.dart';
+import 'package:anixops_mobile/core/services/mfa_api.dart';
+import 'package:anixops_mobile/core/services/schedules_api.dart';
+import 'package:anixops_mobile/core/services/notifications_api.dart';
+import 'package:anixops_mobile/core/services/backup_api.dart';
+import 'package:anixops_mobile/core/services/ai_api.dart';
+import 'package:anixops_mobile/core/services/web3_api.dart';
 
 /// Central API client providing access to all API services
 class ApiClient {
@@ -13,8 +21,16 @@ class ApiClient {
   late final UsersApi users;
   late final PluginsApi plugins;
   late final SshApi ssh;
+  late final PlaybooksApi playbooks;
+  late final TasksApi tasks;
+  late final MFAApi mfa;
+  late final SchedulesApi schedules;
   late final TokensApi tokens;
   late final SessionsApi sessions;
+  late final NotificationsApi notifications;
+  late final BackupApi backup;
+  late final AiApi ai;
+  late final Web3Api web3;
 
   // Cloud API endpoint
   static const String defaultBaseUrl = 'https://api.anixops.com/api/v1';
@@ -60,8 +76,16 @@ class ApiClient {
     users = UsersApi(_dio);
     plugins = PluginsApi(_dio);
     ssh = SshApi(_dio);
+    playbooks = PlaybooksApi(_dio);
+    tasks = TasksApi(_dio);
+    mfa = MFAApi(_dio);
+    schedules = SchedulesApi(_dio);
     tokens = TokensApi(_dio);
     sessions = SessionsApi(_dio);
+    notifications = NotificationsApi(_dio);
+    backup = BackupApi(_dio);
+    ai = AiApi(_dio);
+    web3 = Web3Api(_dio);
   }
 
   /// Update base URL

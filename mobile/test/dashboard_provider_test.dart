@@ -218,12 +218,12 @@ void main() {
 
         final state2 = DashboardState(
           alerts: [
-            const Alert(
+            Alert(
               id: '1',
               level: 'warning',
               title: 'Test',
               message: 'Test',
-              timestamp: null,
+              timestamp: DateTime.now(),
             ),
           ],
         );
@@ -233,26 +233,26 @@ void main() {
       test('criticalAlerts filters correctly', () {
         final state = DashboardState(
           alerts: [
-            const Alert(
+            Alert(
               id: '1',
               level: 'critical',
               title: 'Critical 1',
               message: 'Message 1',
-              timestamp: null,
+              timestamp: DateTime.now(),
             ),
-            const Alert(
+            Alert(
               id: '2',
               level: 'warning',
               title: 'Warning 1',
               message: 'Message 2',
-              timestamp: null,
+              timestamp: DateTime.now(),
             ),
-            const Alert(
+            Alert(
               id: '3',
               level: 'critical',
               title: 'Critical 2',
               message: 'Message 3',
-              timestamp: null,
+              timestamp: DateTime.now(),
             ),
           ],
         );

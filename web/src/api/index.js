@@ -1,8 +1,11 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 
+// Use environment variable or default to Workers API
+const baseURL = import.meta.env.VITE_API_URL || 'https://api.anixops.com/api/v1'
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
@@ -92,4 +95,35 @@ export const logsApi = {
 export const settingsApi = {
   get: () => api.get('/settings'),
   update: (data) => api.put('/settings', data)
+}
+
+// AI Services
+export const aiApi = {
+  chat: (message, history = []) => api.post('/ai/chat', { message, history }),
+  analyzeLog: (logContent) => api.post('/ai/analyze-log', { logContent }),
+  opsAdvice: (context) => api.post('/ai/ops-advice', { context }),
+  embedding: (text) => api.post('/ai/embedding', { text }),
+  query: (query) => api.post('/ai/query', { query })
+}
+
+// Vectorize Services
+export const vectorApi = {
+  search: (embedding, options = {}) => api.post('/vectors/search', { embedding, ...options }),
+  insert: (id, embedding, metadata) => api.post('/vectors', { id, embedding, metadata }),
+  delete: (id) => api.delete(`/vectors/${id}`)
+}
+
+// IPFS Services
+export const ipfsApi = {
+  upload: (data) => api.post('/ipfs/upload', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  get: (cid) => api.get(`/ipfs/${cid}`)
+}
+
+// Web3 Services
+export const web3Api = {
+  challenge: (address) => api.post('/web3/challenge', { address }),
+  verify: (address, signature, message) => api.post('/web3/verify', { address, signature, message }),
+  audit: (auditData) => api.post('/web3/audit', auditData)
 }
