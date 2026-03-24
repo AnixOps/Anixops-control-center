@@ -266,11 +266,11 @@ func TestExecute_AllActions(t *testing.T) {
 	// Test actions that don't require an initialized executor
 	// Actions that call executor.Execute will panic with nil executor
 	actionsWithNilExecutor := map[string]bool{
-		"run_playbook":     true, // Will return error for missing playbook
-		"run_task":         true, // Will return error for missing module
-		"list_playbooks":   true, // Will return failure for missing dir
+		"run_playbook":       true, // Will return error for missing playbook
+		"run_task":           true, // Will return error for missing module
+		"list_playbooks":     true, // Will return failure for missing dir
 		"validate_inventory": true, // Will return failure for missing inventory
-		"get_inventory":    true, // Will return failure for missing inventory
+		"get_inventory":      true, // Will return failure for missing inventory
 	}
 
 	for action, shouldNotPanic := range actionsWithNilExecutor {
