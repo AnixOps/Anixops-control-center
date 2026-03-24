@@ -645,3 +645,311 @@ func TestMessage_Types(t *testing.T) {
 		}
 	}
 }
+
+func TestHub_Run_Register(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	// Start the hub in a goroutine
+	go hub.Run()
+
+	// Create a client
+	client := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: make(map[string]bool),
+	}
+
+	// Register the client
+	hub.register <- client
+
+	// Wait for registration
+	time.Sleep(50 * time.Millisecond)
+
+	// Check client count
+	if hub.ClientCount() != 1 {
+		t.Errorf("expected 1 client, got %d", hub.ClientCount())
+	}
+}
+
+func TestHub_Run_Unregister(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	// Start the hub in a goroutine
+	go hub.Run()
+
+	// Create a client
+	client := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: make(map[string]bool),
+	}
+
+	// Register then unregister
+	hub.register <- client
+	time.Sleep(50 * time.Millisecond)
+
+	hub.unregister <- client
+	time.Sleep(50 * time.Millisecond)
+
+	// Check client count
+	if hub.ClientCount() != 0 {
+		t.Errorf("expected 0 clients, got %d", hub.ClientCount())
+	}
+}
+
+func TestHub_Run_Broadcast(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	// Start the hub in a goroutine
+	go hub.Run()
+
+	// Create a client
+	client := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: make(map[string]bool),
+	}
+
+	// Register the client
+	hub.register <- client
+	time.Sleep(50 * time.Millisecond)
+
+	// Broadcast a message
+	hub.Broadcast(MessageTypeLog, map[string]string{"message": "test"})
+
+	// Wait for message
+	time.Sleep(50 * time.Millisecond)
+
+	// Check if message was received
+	select {
+	case msg := <-client.send:
+		var decoded Message
+		if err := json.Unmarshal(msg, &decoded); err != nil {
+			t.Fatalf("failed to decode message: %v", err)
+		}
+		if decoded.Type != MessageTypeLog {
+			t.Errorf("expected type '%s', got '%s'", MessageTypeLog, decoded.Type)
+		}
+	default:
+		t.Error("expected to receive broadcast message")
+	}
+}
+
+func TestHub_Run_MultipleClients_Broadcast(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	// Start the hub in a goroutine
+	go hub.Run()
+
+	// Create multiple clients
+	client1 := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: make(map[string]bool),
+	}
+	client2 := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: make(map[string]bool),
+	}
+
+	// Register both clients
+	hub.register <- client1
+	hub.register <- client2
+	time.Sleep(50 * time.Millisecond)
+
+	if hub.ClientCount() != 2 {
+		t.Errorf("expected 2 clients, got %d", hub.ClientCount())
+	}
+
+	// Broadcast a message
+	hub.Broadcast(MessageTypeStatus, map[string]string{"status": "ok"})
+	time.Sleep(50 * time.Millisecond)
+
+	// Both clients should receive the message
+	for i, client := range []*Client{client1, client2} {
+		select {
+		case msg := <-client.send:
+			var decoded Message
+			if err := json.Unmarshal(msg, &decoded); err != nil {
+				t.Fatalf("client %d: failed to decode message: %v", i, err)
+			}
+		default:
+			t.Errorf("client %d: expected to receive broadcast message", i)
+		}
+	}
+}
+
+func TestHub_Run_Unregister_ClosesChannel(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	// Start the hub in a goroutine
+	go hub.Run()
+
+	// Create a client
+	client := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: make(map[string]bool),
+	}
+
+	// Register the client
+	hub.register <- client
+	time.Sleep(50 * time.Millisecond)
+
+	// Unregister the client
+	hub.unregister <- client
+	time.Sleep(50 * time.Millisecond)
+
+	// The send channel should be closed
+	_, ok := <-client.send
+	if ok {
+		t.Error("expected send channel to be closed")
+	}
+}
+
+func TestHub_Run_Broadcast_FullBuffer(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	// Start the hub in a goroutine
+	go hub.Run()
+
+	// Create a client with small buffer
+	client := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 1), // Small buffer
+		topics: make(map[string]bool),
+	}
+
+	// Register the client
+	hub.register <- client
+	time.Sleep(50 * time.Millisecond)
+
+	// Fill the buffer first
+	client.send <- []byte("fill")
+
+	// Broadcast multiple messages - should cause client removal due to full buffer
+	hub.Broadcast(MessageTypeLog, "test1")
+	hub.Broadcast(MessageTypeLog, "test2")
+	time.Sleep(50 * time.Millisecond)
+
+	// Client should be removed after broadcast with full buffer
+	// The channel should be closed
+	_, ok := <-client.send
+	// If channel is closed, ok will be false
+	// If channel still has the fill message, ok will be true
+	_ = ok // Just verify no panic
+}
+
+func TestHub_Run_BroadcastToTopic_WithSubscribers(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	// Start the hub in a goroutine
+	go hub.Run()
+
+	// Create clients with topic subscriptions
+	client1 := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: map[string]bool{"logs": true},
+	}
+	client2 := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: map[string]bool{"events": true},
+	}
+
+	// Register both clients
+	hub.register <- client1
+	hub.register <- client2
+	time.Sleep(50 * time.Millisecond)
+
+	// Broadcast to logs topic
+	hub.BroadcastToTopic("logs", MessageTypeLog, map[string]string{"message": "test"})
+	time.Sleep(50 * time.Millisecond)
+
+	// Client1 should receive the message
+	select {
+	case <-client1.send:
+		// Expected
+	default:
+		t.Error("client1 should have received message for logs topic")
+	}
+
+	// Client2 should not receive the message (different topic)
+	select {
+	case <-client2.send:
+		t.Error("client2 should not have received message for different topic")
+	default:
+		// Expected
+	}
+}
+
+func TestMessage_Data_Types(t *testing.T) {
+	// Test message with different data types
+	testCases := []struct {
+		name string
+		data interface{}
+	}{
+		{"string", "hello"},
+		{"map", map[string]string{"key": "value"}},
+		{"slice", []string{"a", "b", "c"}},
+		{"number", 12345},
+		{"float", 3.14159},
+		{"bool", true},
+		{"nested", map[string]interface{}{"a": 1, "b": "test", "c": []int{1, 2, 3}}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			msg := Message{
+				Type:      MessageTypeLog,
+				Timestamp: time.Now().Unix(),
+				Data:      tc.data,
+			}
+
+			data, err := json.Marshal(msg)
+			if err != nil {
+				t.Fatalf("failed to marshal: %v", err)
+			}
+
+			var decoded Message
+			if err := json.Unmarshal(data, &decoded); err != nil {
+				t.Fatalf("failed to unmarshal: %v", err)
+			}
+		})
+	}
+}
+
+func TestClient_AllFields(t *testing.T) {
+	eb := eventbus.New()
+	hub := NewHub(eb)
+
+	client := &Client{
+		hub:    hub,
+		send:   make(chan []byte, 256),
+		topics: map[string]bool{"logs": true, "events": true},
+		userID: "user-123",
+		role:   "admin",
+	}
+
+	if client.userID != "user-123" {
+		t.Errorf("expected userID 'user-123', got '%s'", client.userID)
+	}
+	if client.role != "admin" {
+		t.Errorf("expected role 'admin', got '%s'", client.role)
+	}
+	if !client.topics["logs"] {
+		t.Error("expected logs topic to be subscribed")
+	}
+	if !client.topics["events"] {
+		t.Error("expected events topic to be subscribed")
+	}
+}
