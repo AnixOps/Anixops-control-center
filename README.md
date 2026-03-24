@@ -2,6 +2,8 @@
 
 A unified TUI/GUI control center for managing all AnixOps products.
 
+The Cloudflare Workers API now lives in the standalone `anixops-control-center-workers` repository.
+
 ## Features
 
 - **Plugin Architecture**: Modular plugin system for extensibility

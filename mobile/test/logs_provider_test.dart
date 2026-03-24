@@ -9,14 +9,12 @@ void main() {
       final state = container.read(logsProvider);
 
       expect(state.logs, isEmpty);
-      expect(state.loading, false);
+      expect(state.isLoading, false);
       expect(state.error, isNull);
-      expect(state.search, isEmpty);
-      expect(state.levelFilter, isEmpty);
-      expect(state.sourceFilter, isEmpty);
-      expect(state.streaming, false);
-      expect(state.page, 1);
-      expect(state.hasMore, true);
+      expect(state.searchQuery, isNull);
+      expect(state.levelFilter, isNull);
+      expect(state.sourceFilter, isNull);
+      expect(state.isStreaming, false);
     });
 
     group('LogEntry model', () {
@@ -47,7 +45,7 @@ void main() {
 
         expect(log.id, '');
         expect(log.level, 'info');
-        expect(log.source, '');
+        expect(log.source, 'system'); // default source
         expect(log.message, '');
         expect(log.metadata, isNull);
       });
@@ -71,14 +69,14 @@ void main() {
       test('copyWith works correctly', () {
         const original = LogsState();
         final updated = original.copyWith(
-          loading: true,
+          isLoading: true,
           error: 'Test error',
-          streaming: true,
+          isStreaming: true,
         );
 
-        expect(updated.loading, true);
+        expect(updated.isLoading, true);
         expect(updated.error, 'Test error');
-        expect(updated.streaming, true);
+        expect(updated.isStreaming, true);
         expect(updated.logs, isEmpty); // Unchanged
       });
 
@@ -89,7 +87,7 @@ void main() {
             LogEntry(id: '2', level: 'error', source: 'node', message: 'Connection error', timestamp: DateTime.now()),
             LogEntry(id: '3', level: 'info', source: 'system', message: 'Health check passed', timestamp: DateTime.now()),
           ],
-          search: 'error',
+          searchQuery: 'error',
         );
 
         expect(state.filteredLogs.length, 1);
@@ -130,7 +128,7 @@ void main() {
             LogEntry(id: '3', level: 'info', source: 'system', message: 'System info', timestamp: DateTime.now()),
             LogEntry(id: '4', level: 'error', source: 'system', message: 'Another system error', timestamp: DateTime.now()),
           ],
-          search: 'another',
+          searchQuery: 'another',
           levelFilter: 'error',
           sourceFilter: 'system',
         );
@@ -178,26 +176,16 @@ void main() {
         expect(state.sources.length, 3);
         expect(state.sources, containsAll(['system', 'node.tokyo', 'node.london']));
       });
-
-      test('hasMore defaults to true', () {
-        const state = LogsState();
-        expect(state.hasMore, true);
-      });
-
-      test('page defaults to 1', () {
-        const state = LogsState();
-        expect(state.page, 1);
-      });
     });
 
     group('LogsNotifier', () {
-      test('setSearch updates state', () {
+      test('setSearchQuery updates state', () {
         final container = ProviderContainer();
         final notifier = container.read(logsProvider.notifier);
 
-        notifier.setSearch('error');
+        notifier.setSearchQuery('error');
 
-        expect(container.read(logsProvider).search, 'error');
+        expect(container.read(logsProvider).searchQuery, 'error');
       });
 
       test('setLevelFilter updates state', () {
@@ -246,24 +234,24 @@ void main() {
         expect(state.logs.first.id, '2'); // log2 was added last, should be first
       });
 
-      test('startStreaming sets streaming to true', () {
+      test('startStreaming sets isStreaming to true', () {
         final container = ProviderContainer();
         final notifier = container.read(logsProvider.notifier);
 
         notifier.startStreaming();
 
-        expect(container.read(logsProvider).streaming, true);
+        expect(container.read(logsProvider).isStreaming, true);
       });
 
-      test('stopStreaming sets streaming to false', () {
+      test('stopStreaming sets isStreaming to false', () {
         final container = ProviderContainer();
         final notifier = container.read(logsProvider.notifier);
 
         notifier.startStreaming();
-        expect(container.read(logsProvider).streaming, true);
+        expect(container.read(logsProvider).isStreaming, true);
 
         notifier.stopStreaming();
-        expect(container.read(logsProvider).streaming, false);
+        expect(container.read(logsProvider).isStreaming, false);
       });
 
       test('clearLogs removes all logs', () {

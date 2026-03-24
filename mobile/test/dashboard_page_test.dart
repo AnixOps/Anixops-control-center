@@ -15,6 +15,10 @@ void main() {
         ),
       );
 
+      // Pump a few times to allow microtasks
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
       // Verify app bar is rendered
       expect(find.text('Dashboard'), findsOneWidget);
 
@@ -30,6 +34,9 @@ void main() {
           ),
         ),
       );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // Verify overview title
       expect(find.text('Overview'), findsOneWidget);
@@ -48,11 +55,15 @@ void main() {
         ),
       );
 
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
       // Verify quick actions section
       expect(find.text('Quick Actions'), findsOneWidget);
       expect(find.text('Add Node'), findsOneWidget);
-      expect(find.text('Plugins'), findsOneWidget);
-      expect(find.text('Users'), findsOneWidget);
+      expect(find.text('Playbooks'), findsOneWidget);
+      expect(find.text('Tasks'), findsOneWidget);
+      expect(find.text('Schedules'), findsOneWidget);
     });
 
     testWidgets('shows system health section', (WidgetTester tester) async {
@@ -63,6 +74,9 @@ void main() {
           ),
         ),
       );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
 
       // Verify system health section
       expect(find.text('System Health'), findsOneWidget);

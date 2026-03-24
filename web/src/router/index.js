@@ -39,6 +39,24 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/tasks',
+    name: 'Tasks',
+    component: () => import('@/views/Tasks.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/schedules',
+    name: 'Schedules',
+    component: () => import('@/views/Schedules.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/notifications',
+    name: 'Notifications',
+    component: () => import('@/views/Notifications.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/logs',
     name: 'Logs',
     component: () => import('@/views/Logs.vue'),
@@ -48,6 +66,18 @@ const routes = [
     path: '/settings',
     name: 'Settings',
     component: () => import('@/views/Settings.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/ai',
+    name: 'AIAssistant',
+    component: () => import('@/views/AIAssistant.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/web3',
+    name: 'Web3Dashboard',
+    component: () => import('@/views/Web3Dashboard.vue'),
     meta: { requiresAuth: true }
   }
 ]

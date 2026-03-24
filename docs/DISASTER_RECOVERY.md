@@ -16,7 +16,7 @@
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Cloudflare Workers API                    │
-│  https://anixops-api-v2.kalijerry.workers.dev               │
+│  https://api.anixops.com                                    │
 ├─────────────────────────────────────────────────────────────┤
 │  D1 Database │ KV Namespace │ R2 Storage │ SSE              │
 └─────────────────────────────────────────────────────────────┘
@@ -45,15 +45,15 @@
 #### 手动触发备份
 ```bash
 # 创建备份
-curl -X POST https://anixops-api-v2.kalijerry.workers.dev/api/v1/backups \
+curl -X POST https://api.anixops.com/api/v1/backups \
   -H "Authorization: Bearer <admin-token>"
 
 # 列出所有备份
-curl https://anixops-api-v2.kalijerry.workers.dev/api/v1/backups \
+curl https://api.anixops.com/api/v1/backups \
   -H "Authorization: Bearer <admin-token>"
 
 # 下载备份
-curl https://anixops-api-v2.kalijerry.workers.dev/api/v1/backups/<backup-id>/download \
+curl https://api.anixops.com/api/v1/backups/<backup-id>/download \
   -H "Authorization: Bearer <admin-token>" \
   -o backup.json
 ```
@@ -85,12 +85,12 @@ wrangler kv:key list --namespace-id=35a39ccc4cea47e89aa8b1459f85e1cf
 
 ```bash
 # 1. 下载备份文件
-curl https://anixops-api-v2.kalijerry.workers.dev/api/v1/backups/<backup-id>/download \
+curl https://api.anixops.com/api/v1/backups/<backup-id>/download \
   -H "Authorization: Bearer <admin-token>" \
   -o backup.json
 
 # 2. 恢复备份（通过API）
-curl -X POST https://anixops-api-v2.kalijerry.workers.dev/api/v1/backups/<backup-id>/restore \
+curl -X POST https://api.anixops.com/api/v1/backups/<backup-id>/restore \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{"truncate": true}'
@@ -169,11 +169,11 @@ wrangler d1 execute anixops-db --command="PRAGMA integrity_check"
 3. **恢复备份**
 ```bash
 # 找到最近的备份
-curl https://anixops-api-v2.kalijerry.workers.dev/api/v1/backups \
+curl https://api.anixops.com/api/v1/backups \
   -H "Authorization: Bearer <admin-token>"
 
 # 执行恢复
-curl -X POST https://anixops-api-v2.kalijerry.workers.dev/api/v1/backups/<backup-id>/restore \
+curl -X POST https://api.anixops.com/api/v1/backups/<backup-id>/restore \
   -H "Authorization: Bearer <admin-token>" \
   -H "Content-Type: application/json" \
   -d '{"truncate": true}'
@@ -282,7 +282,7 @@ wrangler deploy
 2. **从备份恢复特定数据**
 ```bash
 # 下载备份
-curl https://anixops-api-v2.kalijerry.workers.dev/api/v1/backups/<backup-id>/download \
+curl https://api.anixops.com/api/v1/backups/<backup-id>/download \
   -H "Authorization: Bearer <admin-token>" \
   -o backup.json
 
@@ -316,10 +316,10 @@ wrangler d1 execute anixops-db --command="INSERT INTO users (email, password_has
 
 ```bash
 # 基础健康检查
-curl https://anixops-api-v2.kalijerry.workers.dev/health
+curl https://api.anixops.com/health
 
 # 就绪检查
-curl https://anixops-api-v2.kalijerry.workers.dev/readiness
+curl https://api.anixops.com/readiness
 ```
 
 ### 5.3 日志收集

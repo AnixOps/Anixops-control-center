@@ -13,13 +13,13 @@
     <!-- Filters -->
     <div class="flex gap-4">
       <input
-        v-model="search"
+        v-model="nodesStore.searchQuery"
         type="text"
         placeholder="Search nodes..."
         class="flex-1 px-4 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
       />
       <select
-        v-model="statusFilter"
+        v-model="nodesStore.statusFilter"
         class="px-4 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
       >
         <option value="">All Status</option>
@@ -28,8 +28,23 @@
       </select>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="nodesStore.loading" class="flex justify-center py-8">
+      <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+    </div>
+
+    <!-- Error State -->
+    <div v-else-if="nodesStore.error" class="bg-red-900/30 text-red-400 px-4 py-3 rounded-lg">
+      {{ nodesStore.error }}
+    </div>
+
+    <!-- Empty State -->
+    <div v-else-if="nodesStore.nodes.length === 0" class="text-center py-8 text-dark-400">
+      No nodes found. Add your first node to get started.
+    </div>
+
     <!-- Nodes Table -->
-    <div class="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
+    <div v-else class="bg-dark-800 rounded-xl border border-dark-700 overflow-hidden">
       <table class="w-full">
         <thead class="bg-dark-700">
           <tr>
@@ -43,7 +58,7 @@
         </thead>
         <tbody class="divide-y divide-dark-700">
           <tr
-            v-for="node in filteredNodes"
+            v-for="node in nodesStore.filteredNodes"
             :key="node.id"
             class="hover:bg-dark-700/50"
           >
@@ -64,8 +79,8 @@
                 {{ node.status }}
               </span>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-dark-300">{{ node.users }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-dark-300">{{ node.traffic }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-dark-300">{{ node.users ?? '-' }}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-dark-300">{{ formatTraffic(node.traffic) }}</td>
             <td class="px-6 py-4 whitespace-nowrap text-right">
               <div class="flex items-center justify-end gap-2">
                 <button
@@ -83,7 +98,7 @@
                   <PencilIcon class="w-4 h-4 text-dark-400" />
                 </button>
                 <button
-                  @click="deleteNode(node)"
+                  @click="confirmDelete(node)"
                   class="p-2 hover:bg-dark-600 rounded-lg transition-colors"
                   title="Delete"
                 >
@@ -95,48 +110,165 @@
         </tbody>
       </table>
     </div>
+
+    <!-- Create/Edit Modal -->
+    <div v-if="showCreateModal || editingNode" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div class="bg-dark-800 rounded-xl p-6 w-full max-w-md border border-dark-700">
+        <h2 class="text-xl font-bold text-white mb-4">
+          {{ editingNode ? 'Edit Node' : 'Add Node' }}
+        </h2>
+
+        <form @submit.prevent="saveNode" class="space-y-4">
+          <div>
+            <label class="block text-sm text-dark-300 mb-1">Name</label>
+            <input
+              v-model="formData.name"
+              type="text"
+              required
+              class="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm text-dark-300 mb-1">Host</label>
+            <input
+              v-model="formData.host"
+              type="text"
+              required
+              placeholder="192.168.1.100"
+              class="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm text-dark-300 mb-1">SSH Port</label>
+            <input
+              v-model.number="formData.port"
+              type="number"
+              class="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div>
+            <label class="block text-sm text-dark-300 mb-1">Username</label>
+            <input
+              v-model="formData.username"
+              type="text"
+              class="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+
+          <div class="flex gap-3 pt-4">
+            <button
+              type="button"
+              @click="closeModal"
+              class="flex-1 px-4 py-2 bg-dark-600 hover:bg-dark-500 text-white rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              :disabled="nodesStore.loading"
+              class="flex-1 px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors disabled:opacity-50"
+            >
+              {{ editingNode ? 'Update' : 'Create' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import {
   ServerIcon,
   EyeIcon,
   PencilIcon,
   TrashIcon
 } from '@heroicons/vue/24/outline'
+import { useNodesStore } from '@/stores/nodes'
+import { useAuthStore } from '@/stores/auth'
 
-const search = ref('')
-const statusFilter = ref('')
+const nodesStore = useNodesStore()
+const authStore = useAuthStore()
+
 const showCreateModal = ref(false)
-
-const nodes = ref([
-  { id: 1, name: 'tokyo-01', host: '192.168.1.101', status: 'online', users: 156, traffic: '1.2TB' },
-  { id: 2, name: 'singapore-01', host: '192.168.1.102', status: 'online', users: 89, traffic: '890GB' },
-  { id: 3, name: 'la-01', host: '192.168.1.103', status: 'offline', users: 0, traffic: '0B' },
-  { id: 4, name: 'frankfurt-01', host: '192.168.1.104', status: 'online', users: 45, traffic: '234GB' },
-  { id: 5, name: 'london-01', host: '192.168.1.105', status: 'online', users: 67, traffic: '456GB' }
-])
-
-const filteredNodes = computed(() => {
-  return nodes.value.filter(node => {
-    const matchesSearch = node.name.toLowerCase().includes(search.value.toLowerCase()) ||
-                          node.host.includes(search.value)
-    const matchesStatus = !statusFilter.value || node.status === statusFilter.value
-    return matchesSearch && matchesStatus
-  })
+const editingNode = ref(null)
+const formData = ref({
+  name: '',
+  host: '',
+  port: 22,
+  username: 'root'
 })
 
+onMounted(async () => {
+  await nodesStore.fetchNodes()
+
+  if (authStore.token) {
+    await nodesStore.subscribeToUpdates(authStore.token)
+  }
+})
+
+onUnmounted(() => {
+  nodesStore.unsubscribeFromUpdates()
+})
+
+function formatTraffic(bytes) {
+  if (!bytes) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let i = 0
+  let value = bytes
+  while (value >= 1024 && i < units.length - 1) {
+    value /= 1024
+    i++
+  }
+  return `${value.toFixed(1)} ${units[i]}`
+}
+
 function viewNode(node) {
+  // Navigate to node detail page
   console.log('View node:', node)
 }
 
 function editNode(node) {
-  console.log('Edit node:', node)
+  editingNode.value = node
+  formData.value = {
+    name: node.name,
+    host: node.host,
+    port: node.port || 22,
+    username: node.username || 'root'
+  }
 }
 
-function deleteNode(node) {
-  console.log('Delete node:', node)
+async function confirmDelete(node) {
+  if (confirm(`Are you sure you want to delete "${node.name}"?`)) {
+    await nodesStore.deleteNode(node.id)
+  }
+}
+
+async function saveNode() {
+  let result
+  if (editingNode.value) {
+    result = await nodesStore.updateNode(editingNode.value.id, formData.value)
+  } else {
+    result = await nodesStore.createNode(formData.value)
+  }
+
+  if (result.success) {
+    closeModal()
+  }
+}
+
+function closeModal() {
+  showCreateModal.value = false
+  editingNode.value = null
+  formData.value = {
+    name: '',
+    host: '',
+    port: 22,
+    username: 'root'
+  }
 }
 </script>
