@@ -1,10 +1,46 @@
 # 主仓第一批拆耦改动清单
 
 ## 目标
-在 Workers 独立仓准备完成后，主仓需要先完成第一批拆耦，移除对 `workers/` 源码路径的直接工程依赖。
+在 Workers 独立仓准备完成后，主仓先完成第一批拆耦，移除对 `workers/` 源码路径的直接工程依赖。
+
+## 与总 Runbook 的关系
+本清单只负责主仓第一批拆耦，完整迁移顺序以 `workers-repo-migration-guide.md` 为准。
+
+## 一页执行清单
+1. 先改 `.github/workflows/ci.yml`。
+2. 再改 `.github/workflows/release.yml`。
+3. 再改 `scripts/version.sh`。
+4. 最后改 `README.md` / `CHANGELOG.md`。
+5. 确认主仓不再直接依赖 `workers/` 源码路径。
+
+## 交付口径
+- 主仓 CI 不再读取 `workers/package-lock.json`、`workers/coverage/lcov.info` 或 `working-directory: workers`
+- 主仓 release 不再承载 Workers 发布职责
+- 主仓 version 脚本不再默认推进 Workers 版本
+- 主仓文档只保留独立 Workers 仓的引用与集成说明
+
+## 最终检查表
+- [ ] `.github/workflows/ci.yml` 已去除 `workers/*` 直接引用
+- [ ] `.github/workflows/release.yml` 已移除 Workers 发布职责
+- [ ] `scripts/version.sh` 已去掉 Workers 统一版本推进假设
+- [ ] `README.md` 已指向独立 workers 仓
+- [ ] `CHANGELOG.md` 已仅保留产品级整合影响
+- [ ] 主仓不再依赖 `workers/` 源码路径
+- [ ] Web / Mobile 相关契约验证位点已复核
+
+## 主仓保留内容
+- `web/`
+- `mobile/`
+- Go 主程序
+- 聚合文档
+- 指向 workers 新仓的集成说明
+
+## 主仓移除内容
+- `workers/` 源码实现目录
+- workers 专属 CI / release 逻辑
+- workers 版本统一推进假设
 
 ## 必改文件
-
 ### 1. CI
 - `.github/workflows/ci.yml`
 
@@ -53,12 +89,6 @@
 - `mobile/lib/core/providers/api_providers.dart`
 - `mobile/lib/core/services/sse_service.dart`
 - `mobile/lib/core/services/websocket_service.dart`
-
-## 第一批拆耦顺序建议
-1. 先改 `.github/workflows/ci.yml`
-2. 再改 `.github/workflows/release.yml`
-3. 再改 `scripts/version.sh`
-4. 最后改 `README.md` / `CHANGELOG.md`
 
 ## 风险提示
 - 如果先删 `workers/` 再改 CI，会直接把主仓 pipeline 打坏
