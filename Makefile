@@ -57,6 +57,32 @@ test-race:
 	$(GO) test -race ./...
 
 ## ============================================================================
+## Test Reports
+## ============================================================================
+
+test-report:
+	@echo "Generating comprehensive test report..."
+	@chmod +x scripts/test-report/run-all-tests.sh 2>/dev/null || true
+	@bash scripts/test-report/run-all-tests.sh
+	@echo "Report generated at reports/test-reports/latest/summary.html"
+
+test-report-quick:
+	@echo "Generating quick test report (skip Vue)..."
+	@chmod +x scripts/test-report/run-all-tests.sh 2>/dev/null || true
+	@bash scripts/test-report/run-all-tests.sh --skip-vue
+	@echo "Report generated at reports/test-reports/latest/summary.html"
+
+test-report-clean:
+	rm -rf reports/test-reports/latest/*
+	rm -rf reports/test-reports/historical/*
+
+test-report-open: test-report
+	@open reports/test-reports/latest/summary.html 2>/dev/null || \
+	 xdg-open reports/test-reports/latest/summary.html 2>/dev/null || \
+	 start reports/test-reports/latest/summary.html 2>/dev/null || \
+	 echo "Open reports/test-reports/latest/summary.html manually"
+
+## ============================================================================
 ## Quality
 ## ============================================================================
 
@@ -197,6 +223,10 @@ help:
 	@echo "  test-coverage      Run tests with coverage report"
 	@echo "  test-critical      Run critical function tests"
 	@echo "  test-race          Run tests with race detection"
+	@echo "  test-report        Generate comprehensive test report (all projects)"
+	@echo "  test-report-quick  Generate quick test report (skip Vue)"
+	@echo "  test-report-clean  Clean test report artifacts"
+	@echo "  test-report-open   Generate and open test report"
 	@echo ""
 	@echo "Quality:"
 	@echo "  lint           Run linter"

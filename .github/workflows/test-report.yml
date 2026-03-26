@@ -1,0 +1,181 @@
+# =============================================================================
+# AnixOps Test Report Workflow
+# Runs tests across all projects and generates unified reports
+# =============================================================================
+
+name: Test Report
+
+on:
+  push:
+    branches: [dev, production, main, master]
+  pull_request:
+    branches: [dev, production, main, master]
+  workflow_dispatch:
+    inputs:
+      skip_go:
+        description: 'Skip Go backend tests'
+        type: boolean
+        default: false
+      skip_workers:
+        description: 'Skip Node.js Workers tests'
+        type: boolean
+        default: false
+      skip_flutter:
+        description: 'Skip Flutter tests'
+        type: boolean
+        default: false
+      skip_vue:
+        description: 'Skip Vue Web tests'
+        type: boolean
+        default: false
+      skip_coverage_threshold:
+        description: 'Skip coverage threshold check'
+        type: boolean
+        default: false
+
+env:
+  GO_VERSION: '1.24'
+  NODE_VERSION: '22'
+  FLUTTER_VERSION: '3.41.5'
+
+jobs:
+  test-report:
+    name: Generate Test Report
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      checks: write
+
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout workers repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/anixops-control-center-workers
+          path: anixops-control-center-workers
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Setup environments
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+
+      - name: Install dependencies
+        run: |
+          # Install Workers dependencies
+          cd anixops-control-center-workers
+          npm ci
+
+          # Install Web dependencies (if exists)
+          if [ -d "web" ]; then
+            cd web
+            npm ci
+          fi
+
+      # Run tests and generate report
+      - name: Run all tests and generate report
+        run: |
+          chmod +x scripts/test-report/run-all-tests.sh
+          ./scripts/test-report/run-all-tests.sh \
+            ${{ inputs.skip_go && '--skip-go' || '' }} \
+            ${{ inputs.skip_workers && '--skip-workers' || '' }} \
+            ${{ inputs.skip_flutter && '--skip-flutter' || '' }} \
+            ${{ inputs.skip_vue && '--skip-vue' || '' }} \
+            ${{ inputs.skip_coverage_threshold && '--skip-coverage-threshold' || '' }}
+        env:
+          CI: true
+
+      # Upload artifacts
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: reports/test-reports/latest/
+          retention-days: 30
+
+      - name: Upload historical reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: historical-reports
+          path: reports/test-reports/historical/
+          retention-days: 90
+
+      # PR Comment with summary
+      - name: Comment PR with summary
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summaryPath = 'reports/test-reports/latest/summary.md';
+            if (fs.existsSync(summaryPath)) {
+              const summary = fs.readFileSync(summaryPath, 'utf8');
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: summary
+              });
+            }
+
+      # Create check run
+      - name: Create check run
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summaryPath = 'reports/test-reports/latest/summary.json';
+            if (fs.existsSync(summaryPath)) {
+              const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+              const coverageMet = summary.coverageThresholdMet ? '✅ Coverage threshold met' : '⚠️ Coverage threshold not met';
+              await github.rest.checks.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'Test Report',
+                head_sha: context.sha,
+                status: 'completed',
+                conclusion: summary.passed ? 'success' : 'failure',
+                output: {
+                  title: summary.passed ? 'All tests passed' : 'Tests or coverage failed',
+                  summary: `**${summary.aggregated.testExecution.passed}/${summary.aggregated.testExecution.total}** tests passed\n**${summary.aggregated.coverage.lines.percentage.toFixed(1)}%** coverage (threshold: ${summary.thresholds.lines}%)\n${coverageMet}`
+                }
+              });
+            }
+
+      # Upload coverage to Codecov
+      - name: Upload Workers coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: reports/test-reports/latest/backend-workers/coverage/coverage-final.json
+          flags: backend-workers
+          fail_ci_if_error: false
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      # Fail if tests failed
+      - name: Check test results
+        run: |
+          if [ -f "reports/test-reports/latest/summary.json" ]; then
+            PASSED=$(jq '.passed' reports/test-reports/latest/summary.json)
+            if [ "$PASSED" != "true" ]; then
+              echo "::error::Tests failed. See report for details."
+              exit 1
+            fi
+          fi
