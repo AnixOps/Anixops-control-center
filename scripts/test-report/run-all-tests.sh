@@ -8,7 +8,10 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-WORKERS_ROOT="${PROJECT_ROOT}/../anixops-control-center-workers"
+WORKERS_ROOT="${PROJECT_ROOT}/anixops-control-center-workers"
+if [ ! -d "$WORKERS_ROOT" ] && [ -d "${PROJECT_ROOT}/../anixops-control-center-workers" ]; then
+  WORKERS_ROOT="${PROJECT_ROOT}/../anixops-control-center-workers"
+fi
 MOBILE_ROOT="${PROJECT_ROOT}/mobile"
 WEB_ROOT="${PROJECT_ROOT}/web"
 REPORT_DIR="${PROJECT_ROOT}/reports/test-reports"
@@ -252,14 +255,17 @@ if [ "$SKIP_REPORTS" = false ]; then
 
   cd "$PROJECT_ROOT"
 
-  # Build command with optional flags
-  REPORT_CMD="node \"$SCRIPT_DIR/generate-reports.js\" --output \"$REPORT_DIR/latest\" --timestamp \"$TIMESTAMP\""
+  REPORT_ARGS=(
+    node "$SCRIPT_DIR/generate-reports.js"
+    --output "$REPORT_DIR/latest"
+    --timestamp "$TIMESTAMP"
+  )
 
   if [ "$SKIP_COVERAGE_THRESHOLD" = true ]; then
-    REPORT_CMD="$REPORT_CMD --skip-coverage-threshold"
+    REPORT_ARGS+=(--skip-coverage-threshold)
   fi
 
-  eval $REPORT_CMD
+  "${REPORT_ARGS[@]}"
 
   # Copy to historical
   cp -r "$REPORT_DIR/latest"/* "$REPORT_DIR/historical/$TIMESTAMP/"
