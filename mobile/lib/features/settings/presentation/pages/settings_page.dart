@@ -45,8 +45,9 @@ class SettingsState {
   }
 }
 
-class SettingsNotifier extends StateNotifier<SettingsState> {
-  SettingsNotifier() : super(const SettingsState());
+class SettingsNotifier extends Notifier<SettingsState> {
+  @override
+  SettingsState build() => const SettingsState();
 
   void setTwoFactor(bool value) => state = state.copyWith(twoFactorEnabled: value);
   void setAutoBackup(bool value) => state = state.copyWith(autoBackup: value);
@@ -56,9 +57,7 @@ class SettingsNotifier extends StateNotifier<SettingsState> {
   void setSessionTimeout(int value) => state = state.copyWith(sessionTimeout: value);
 }
 
-final settingsProvider = StateNotifierProvider<SettingsNotifier, SettingsState>((ref) {
-  return SettingsNotifier();
-});
+final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(SettingsNotifier.new);
 
 // Settings Page
 class SettingsPage extends ConsumerWidget {

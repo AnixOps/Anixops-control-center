@@ -15,11 +15,44 @@ class ChatMessage {
   });
 }
 
+/// Chat history state
+class ChatHistoryState {
+  final List<ChatMessage> messages;
+
+  const ChatHistoryState({this.messages = const []});
+
+  ChatHistoryState copyWith({List<ChatMessage>? messages}) {
+    return ChatHistoryState(messages: messages ?? this.messages);
+  }
+}
+
 /// Chat history provider
-final chatHistoryProvider = StateProvider<List<ChatMessage>>((ref) => []);
+final chatHistoryProvider = NotifierProvider<ChatHistoryNotifier, ChatHistoryState>(ChatHistoryNotifier.new);
+
+class ChatHistoryNotifier extends Notifier<ChatHistoryState> {
+  @override
+  ChatHistoryState build() => const ChatHistoryState();
+
+  void addMessage(ChatMessage message) {
+    state = ChatHistoryState(messages: [...state.messages, message]);
+  }
+
+  void clear() {
+    state = const ChatHistoryState();
+  }
+}
 
 /// Thinking state provider
-final isThinkingProvider = StateProvider<bool>((ref) => false);
+final isThinkingProvider = NotifierProvider<IsThinkingNotifier, bool>(IsThinkingNotifier.new);
+
+class IsThinkingNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void setThinking(bool value) {
+    state = value;
+  }
+}
 
 /// AI Assistant Page
 class AIAssistantPage extends ConsumerStatefulWidget {
@@ -46,15 +79,14 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
     if (message.isEmpty) return;
 
     _controller.clear();
-    final history = ref.read(chatHistoryProvider);
+    final history = ref.read(chatHistoryProvider).messages;
 
     // Add user message
-    ref.read(chatHistoryProvider.notifier).state = [
-      ...history,
+    ref.read(chatHistoryProvider.notifier).addMessage(
       ChatMessage(role: 'user', content: message, timestamp: DateTime.now()),
-    ];
+    );
 
-    ref.read(isThinkingProvider.notifier).state = true;
+    ref.read(isThinkingProvider.notifier).setThinking(true);
 
     try {
       final response = await apiClient.ai.chat(
@@ -64,21 +96,19 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
 
       final assistantMessage = response['response'] ?? response['data']?['response'] ?? 'I could not generate a response.';
 
-      ref.read(chatHistoryProvider.notifier).state = [
-        ...ref.read(chatHistoryProvider),
+      ref.read(chatHistoryProvider.notifier).addMessage(
         ChatMessage(role: 'assistant', content: assistantMessage, timestamp: DateTime.now()),
-      ];
+      );
     } catch (e) {
-      ref.read(chatHistoryProvider.notifier).state = [
-        ...ref.read(chatHistoryProvider),
+      ref.read(chatHistoryProvider.notifier).addMessage(
         ChatMessage(
           role: 'assistant',
           content: 'Sorry, I encountered an error: $e',
           timestamp: DateTime.now(),
         ),
-      ];
+      );
     } finally {
-      ref.read(isThinkingProvider.notifier).state = false;
+      ref.read(isThinkingProvider.notifier).setThinking(false);
     }
 
     // Scroll to bottom
@@ -100,7 +130,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
 
   @override
   Widget build(BuildContext context) {
-    final chatHistory = ref.watch(chatHistoryProvider);
+    final chatHistoryState = ref.watch(chatHistoryProvider);
     final isThinking = ref.watch(isThinkingProvider);
 
     return Scaffold(
@@ -119,7 +149,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
           IconButton(
             icon: const Icon(Icons.delete_outline),
             onPressed: () {
-              ref.read(chatHistoryProvider.notifier).state = [];
+              ref.read(chatHistoryProvider.notifier).clear();
             },
             tooltip: 'Clear chat',
           ),
@@ -148,7 +178,7 @@ class _AIAssistantPageState extends ConsumerState<AIAssistantPage> {
           // Content
           Expanded(
             child: _activeTab == 0
-                ? _buildChatTab(chatHistory, isThinking)
+                ? _buildChatTab(chatHistoryState.messages, isThinking)
                 : _activeTab == 1
                     ? _buildAnalyzeTab()
                     : _buildSearchTab(),

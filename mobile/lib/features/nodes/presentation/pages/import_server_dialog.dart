@@ -47,7 +47,7 @@ class _ImportServerDialogState extends ConsumerState<ImportServerDialog> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await apiClient.ssh.testConnection(
+      final response = await apiClient.ssh.test(
         host: _hostController.text,
         port: int.parse(_portController.text),
         username: _usernameController.text,
@@ -57,10 +57,10 @@ class _ImportServerDialogState extends ConsumerState<ImportServerDialog> {
         passphrase: _passphraseController.text.isNotEmpty ? _passphraseController.text : null,
       );
 
-      if (response.data['success'] == true) {
+      if (response.data.success) {
         setState(() {
           _connectionTested = true;
-          _detectedType = response.data['data']?['server_type'] ?? 'unknown';
+          _detectedType = response.data.serverType ?? 'unknown';
         });
 
         if (mounted) {
@@ -72,7 +72,7 @@ class _ImportServerDialogState extends ConsumerState<ImportServerDialog> {
           );
         }
       } else {
-        throw Exception(response.data['error'] ?? 'Connection failed');
+        throw Exception(response.data.error ?? 'Connection failed');
       }
     } catch (e) {
       if (mounted) {
@@ -94,7 +94,7 @@ class _ImportServerDialogState extends ConsumerState<ImportServerDialog> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await apiClient.ssh.importServer(
+      final response = await apiClient.ssh.import(
         host: _hostController.text,
         port: int.parse(_portController.text),
         username: _usernameController.text,
@@ -107,7 +107,7 @@ class _ImportServerDialogState extends ConsumerState<ImportServerDialog> {
         name: _nameController.text.isNotEmpty ? _nameController.text : null,
       );
 
-      if (response.data['success'] == true) {
+      if (response.data.success) {
         if (mounted) {
           Navigator.of(context).pop(true);
           ScaffoldMessenger.of(context).showSnackBar(
@@ -118,7 +118,7 @@ class _ImportServerDialogState extends ConsumerState<ImportServerDialog> {
           );
         }
       } else {
-        throw Exception(response.data['error'] ?? 'Import failed');
+        throw Exception(response.data.error ?? 'Import failed');
       }
     } catch (e) {
       if (mounted) {

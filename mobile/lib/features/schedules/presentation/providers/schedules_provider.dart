@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/schedules_api.dart';
+import '../../../../core/models/schedule_models.dart';
 import '../../../../core/providers/api_providers.dart';
 
 /// Schedules state
@@ -30,22 +30,25 @@ class SchedulesState {
   List<Schedule> get disabledSchedules => schedules.where((s) => !s.enabled).toList();
 }
 
-/// Schedules notifier
-class SchedulesNotifier extends StateNotifier<SchedulesState> {
-  final SchedulesApi _api;
+/// Provider for SchedulesState
+final schedulesProvider = NotifierProvider<SchedulesNotifier, SchedulesState>(SchedulesNotifier.new);
 
-  SchedulesNotifier(this._api) : super(const SchedulesState()) {
-    loadSchedules();
+/// Schedules notifier
+class SchedulesNotifier extends Notifier<SchedulesState> {
+  @override
+  SchedulesState build() {
+    Future.microtask(() => loadSchedules());
+    return const SchedulesState();
   }
 
-  /// Load all schedules
   Future<void> loadSchedules() async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final schedules = await _api.getSchedules();
+      final client = ref.read(apiClientProvider);
+      final response = await client.schedules.list();
       state = state.copyWith(
-        schedules: schedules,
+        schedules: response.data.items,
         isLoading: false,
       );
     } catch (e) {
@@ -56,53 +59,10 @@ class SchedulesNotifier extends StateNotifier<SchedulesState> {
     }
   }
 
-  /// Create schedule
-  Future<Schedule?> createSchedule({
-    required String name,
-    required int playbookId,
-    required String cron,
-    String timezone = 'UTC',
-    required List<dynamic> targetNodes,
-    Map<String, dynamic>? variables,
-    bool enabled = true,
-  }) async {
+  Future<bool> createSchedule(ScheduleRequest request) async {
     try {
-      final schedule = await _api.createSchedule(
-        name: name,
-        playbookId: playbookId,
-        cron: cron,
-        timezone: timezone,
-        targetNodes: targetNodes,
-        variables: variables,
-        enabled: enabled,
-      );
-      await loadSchedules();
-      return schedule;
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-      return null;
-    }
-  }
-
-  /// Update schedule
-  Future<bool> updateSchedule(int id, {
-    String? name,
-    String? cron,
-    String? timezone,
-    List<dynamic>? targetNodes,
-    Map<String, dynamic>? variables,
-    bool? enabled,
-  }) async {
-    try {
-      await _api.updateSchedule(
-        id,
-        name: name,
-        cron: cron,
-        timezone: timezone,
-        targetNodes: targetNodes,
-        variables: variables,
-        enabled: enabled,
-      );
+      final client = ref.read(apiClientProvider);
+      await client.schedules.create(request);
       await loadSchedules();
       return true;
     } catch (e) {
@@ -111,10 +71,22 @@ class SchedulesNotifier extends StateNotifier<SchedulesState> {
     }
   }
 
-  /// Delete schedule
+  Future<bool> updateSchedule(int id, ScheduleRequest request) async {
+    try {
+      final client = ref.read(apiClientProvider);
+      await client.schedules.update(id, request);
+      await loadSchedules();
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      return false;
+    }
+  }
+
   Future<bool> deleteSchedule(int id) async {
     try {
-      await _api.deleteSchedule(id);
+      final client = ref.read(apiClientProvider);
+      await client.schedules.delete(id);
       state = state.copyWith(
         schedules: state.schedules.where((s) => s.id != id).toList(),
       );
@@ -125,10 +97,10 @@ class SchedulesNotifier extends StateNotifier<SchedulesState> {
     }
   }
 
-  /// Toggle schedule enabled
   Future<bool> toggleSchedule(int id) async {
     try {
-      final newEnabled = await _api.toggleSchedule(id);
+      final client = ref.read(apiClientProvider);
+      final newEnabled = await client.schedules.toggle(id);
       state = state.copyWith(
         schedules: state.schedules.map((s) {
           if (s.id == id) {
@@ -137,17 +109,15 @@ class SchedulesNotifier extends StateNotifier<SchedulesState> {
               name: s.name,
               playbookId: s.playbookId,
               playbookName: s.playbookName,
-              category: s.category,
               cron: s.cron,
               timezone: s.timezone,
               targetNodes: s.targetNodes,
               variables: s.variables,
               enabled: newEnabled,
-              nextRun: s.nextRun,
               lastRun: s.lastRun,
+              nextRun: s.nextRun,
               lastTaskId: s.lastTaskId,
               createdBy: s.createdBy,
-              createdByEmail: s.createdByEmail,
               createdAt: s.createdAt,
               updatedAt: s.updatedAt,
             );
@@ -162,10 +132,10 @@ class SchedulesNotifier extends StateNotifier<SchedulesState> {
     }
   }
 
-  /// Run schedule now
   Future<String?> runScheduleNow(int id) async {
     try {
-      final taskId = await _api.runScheduleNow(id);
+      final client = ref.read(apiClientProvider);
+      final taskId = await client.schedules.runNow(id);
       await loadSchedules();
       return taskId;
     } catch (e) {
@@ -174,14 +144,7 @@ class SchedulesNotifier extends StateNotifier<SchedulesState> {
     }
   }
 
-  /// Clear error
   void clearError() {
     state = state.copyWith(error: null);
   }
 }
-
-/// Provider for SchedulesState
-final schedulesProvider = StateNotifierProvider<SchedulesNotifier, SchedulesState>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return SchedulesNotifier(client.schedules);
-});

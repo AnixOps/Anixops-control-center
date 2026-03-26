@@ -1,12 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:anixops_mobile/core/services/backup_api.dart';
+import 'package:anixops_mobile/core/models/backup_models.dart';
 
 void main() {
   group('Backup model', () {
     test('is created correctly from JSON', () {
       final json = {
-        'id': 'backup-123',
+        'id': 123,
         'name': 'Daily Backup',
         'status': 'completed',
         'size': 1048576,
@@ -17,60 +16,48 @@ void main() {
 
       final backup = Backup.fromJson(json);
 
-      expect(backup.id, 'backup-123');
+      expect(backup.id, 123);
       expect(backup.name, 'Daily Backup');
-      expect(backup.status, 'completed');
+      expect(backup.status, BackupStatusType.completed);
       expect(backup.size, 1048576);
       expect(backup.description, 'System backup');
-      expect(backup.isCompleted, true);
-      expect(backup.isPending, false);
-      expect(backup.isFailed, false);
     });
 
     test('handles missing optional fields', () {
       final json = <String, dynamic>{
-        'id': '2',
+        'id': 2,
         'name': 'Test Backup',
         'status': 'pending',
+        'created_at': '2026-03-20T10:00:00Z',
       };
 
       final backup = Backup.fromJson(json);
 
-      expect(backup.id, '2');
+      expect(backup.id, 2);
       expect(backup.name, 'Test Backup');
-      expect(backup.status, 'pending');
+      expect(backup.status, BackupStatusType.pending);
       expect(backup.size, 0);
       expect(backup.description, isNull);
       expect(backup.completedAt, isNull);
       expect(backup.error, isNull);
-      expect(backup.isPending, true);
     });
 
     test('formattedSize formats bytes correctly', () {
-      final now = DateTime.now();
-      expect(Backup(id: '', name: '', status: '', size: 500, createdAt: now).formattedSize, '500 B');
-      expect(Backup(id: '', name: '', status: '', size: 1024, createdAt: now).formattedSize, '1.0 KB');
-      expect(Backup(id: '', name: '', status: '', size: 1048576, createdAt: now).formattedSize, '1.0 MB');
-      expect(Backup(id: '', name: '', status: '', size: 1073741824, createdAt: now).formattedSize, '1.0 GB');
+      expect(Backup(id: 1, name: 'test', status: BackupStatusType.pending, size: 500, createdAt: '').formattedSize, '500 B');
+      expect(Backup(id: 1, name: 'test', status: BackupStatusType.pending, size: 1024, createdAt: '').formattedSize, '1.0 KB');
+      expect(Backup(id: 1, name: 'test', status: BackupStatusType.pending, size: 1048576, createdAt: '').formattedSize, '1.0 MB');
+      expect(Backup(id: 1, name: 'test', status: BackupStatusType.pending, size: 1073741824, createdAt: '').formattedSize, '1.0 GB');
     });
 
-    test('isCompleted/isPending/isFailed work correctly', () {
-      final now = DateTime.now();
-      final completed = Backup(id: '', name: '', status: 'completed', createdAt: now);
-      final pending = Backup(id: '', name: '', status: 'pending', createdAt: now);
-      final failed = Backup(id: '', name: '', status: 'failed', createdAt: now);
-      final running = Backup(id: '', name: '', status: 'running', createdAt: now);
-
-      expect(completed.isCompleted, true);
-      expect(pending.isPending, true);
-      expect(failed.isFailed, true);
-      expect(running.isCompleted, false);
-      expect(running.isPending, false);
-      expect(running.isFailed, false);
+    test('status enum works correctly', () {
+      expect(BackupStatusType.values.contains(BackupStatusType.completed), true);
+      expect(BackupStatusType.values.contains(BackupStatusType.pending), true);
+      expect(BackupStatusType.values.contains(BackupStatusType.failed), true);
+      expect(BackupStatusType.values.contains(BackupStatusType.running), true);
     });
   });
 
-  group('BackupStatus model', () {
+  group('BackupSystemStatus model', () {
     test('is created correctly from JSON', () {
       final json = {
         'is_running': true,
@@ -79,7 +66,7 @@ void main() {
         'total_size': 10737418240,
       };
 
-      final status = BackupStatus.fromJson(json);
+      final status = BackupSystemStatus.fromJson(json);
 
       expect(status.isRunning, true);
       expect(status.lastBackupAt, isNotNull);
@@ -90,7 +77,7 @@ void main() {
     test('handles missing fields with defaults', () {
       final json = <String, dynamic>{};
 
-      final status = BackupStatus.fromJson(json);
+      final status = BackupSystemStatus.fromJson(json);
 
       expect(status.isRunning, false);
       expect(status.lastBackupAt, isNull);

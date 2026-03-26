@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:anixops_mobile/core/models/node_models.dart';
 
 /// Nodes API endpoints
 class NodesApi {
@@ -7,88 +8,95 @@ class NodesApi {
   NodesApi(this._dio);
 
   /// List all nodes with optional filters
-  Future<Response> list({
+  Future<NodeSummaryResponse> list({
     String? search,
     String? status,
     String? type,
     int page = 1,
     int limit = 20,
   }) async {
-    return _dio.get('/nodes', queryParameters: {
+    final response = await _dio.get('/nodes', queryParameters: {
       if (search != null) 'search': search,
       if (status != null) 'status': status,
       if (type != null) 'type': type,
       'page': page,
       'limit': limit,
     });
+    return NodeSummaryResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Get a single node by ID
-  Future<Response> get(String id) async {
-    return _dio.get('/nodes/$id');
+  Future<NodeGetResponse> get(String id) async {
+    final response = await _dio.get('/nodes/$id');
+    return NodeGetResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Create a new node
-  Future<Response> create(Map<String, dynamic> data) async {
-    return _dio.post('/nodes', data: data);
+  Future<NodeGetResponse> create(Map<String, dynamic> data) async {
+    final response = await _dio.post('/nodes', data: data);
+    return NodeGetResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Update a node
-  Future<Response> update(String id, Map<String, dynamic> data) async {
-    return _dio.put('/nodes/$id', data: data);
+  Future<NodeGetResponse> update(String id, Map<String, dynamic> data) async {
+    final response = await _dio.put('/nodes/$id', data: data);
+    return NodeGetResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Delete a node
-  Future<Response> delete(String id) async {
-    return _dio.delete('/nodes/$id');
+  Future<void> delete(String id) async {
+    await _dio.delete('/nodes/$id');
   }
 
   /// Start a node
-  Future<Response> start(String id) async {
-    return _dio.post('/nodes/$id/start');
+  Future<void> start(String id) async {
+    await _dio.post('/nodes/$id/start');
   }
 
   /// Stop a node
-  Future<Response> stop(String id) async {
-    return _dio.post('/nodes/$id/stop');
+  Future<void> stop(String id) async {
+    await _dio.post('/nodes/$id/stop');
   }
 
   /// Restart a node
-  Future<Response> restart(String id) async {
-    return _dio.post('/nodes/$id/restart');
+  Future<void> restart(String id) async {
+    await _dio.post('/nodes/$id/restart');
   }
 
   /// Get node statistics
-  Future<Response> stats(String id) async {
-    return _dio.get('/nodes/$id/stats');
+  Future<NodeStatsResponse> stats(String id) async {
+    final response = await _dio.get('/nodes/$id/stats');
+    return NodeStatsResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Get node logs
-  Future<Response> logs(String id, {int limit = 100, String? level}) async {
-    return _dio.get('/nodes/$id/logs', queryParameters: {
+  Future<NodeLogsResponse> logs(String id, {int limit = 100, String? level}) async {
+    final response = await _dio.get('/nodes/$id/logs', queryParameters: {
       'limit': limit,
       if (level != null) 'level': level,
     });
+    return NodeLogsResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Test node connection
-  Future<Response> testConnection(String id) async {
-    return _dio.post('/nodes/$id/test');
+  Future<void> testConnection(String id) async {
+    await _dio.post('/nodes/$id/test');
   }
 
   /// Sync node configuration
-  Future<Response> sync(String id) async {
-    return _dio.post('/nodes/$id/sync');
+  Future<void> sync(String id) async {
+    await _dio.post('/nodes/$id/sync');
   }
 
   /// Bulk operations on nodes
-  Future<Response> bulkAction({
+  Future<NodeBulkActionResponse> bulkAction({
     required List<String> nodeIds,
     required String action, // start, stop, restart, delete
   }) async {
-    return _dio.post('/nodes/bulk', data: {
+    final response = await _dio.post('/nodes/bulk', data: {
       'node_ids': nodeIds,
       'action': action,
     });
+    return NodeBulkActionResponse.fromJson(response.data as Map<String, dynamic>);
   }
 }

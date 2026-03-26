@@ -8,12 +8,11 @@ final storageServiceProvider = FutureProvider<StorageService>((ref) async {
 });
 
 /// Provider for auth token
-final authTokenProvider = StateNotifierProvider<AuthTokenNotifier, String?>((ref) {
-  return AuthTokenNotifier();
-});
+final authTokenProvider = NotifierProvider<AuthTokenNotifier, String?>(AuthTokenNotifier.new);
 
-class AuthTokenNotifier extends StateNotifier<String?> {
-  AuthTokenNotifier() : super(null);
+class AuthTokenNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
 
   Future<void> load() async {
     final storage = await StorageService.instance;
@@ -38,12 +37,11 @@ class AuthTokenNotifier extends StateNotifier<String?> {
 }
 
 /// Provider for theme mode
-final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, String>((ref) {
-  return ThemeModeNotifier();
-});
+final themeModeStorageProvider = NotifierProvider<ThemeModeNotifier, String>(ThemeModeNotifier.new);
 
-class ThemeModeNotifier extends StateNotifier<String> {
-  ThemeModeNotifier() : super('system');
+class ThemeModeNotifier extends Notifier<String> {
+  @override
+  String build() => 'system';
 
   Future<void> load() async {
     final storage = await StorageService.instance;
@@ -58,12 +56,11 @@ class ThemeModeNotifier extends StateNotifier<String> {
 }
 
 /// Provider for API URL
-final apiUrlProvider = StateNotifierProvider<ApiUrlNotifier, String>((ref) {
-  return ApiUrlNotifier();
-});
+final apiUrlProvider = NotifierProvider<ApiUrlNotifier, String>(ApiUrlNotifier.new);
 
-class ApiUrlNotifier extends StateNotifier<String> {
-  ApiUrlNotifier() : super('http://localhost:8080/api/v1');
+class ApiUrlNotifier extends Notifier<String> {
+  @override
+  String build() => 'http://localhost:8080/api/v1';
 
   Future<void> load() async {
     final storage = await StorageService.instance;
@@ -78,12 +75,11 @@ class ApiUrlNotifier extends StateNotifier<String> {
 }
 
 /// Provider for notifications enabled
-final notificationsEnabledProvider = StateNotifierProvider<NotificationsNotifier, bool>((ref) {
-  return NotificationsNotifier();
-});
+final notificationsEnabledProvider = NotifierProvider<NotificationsNotifier, bool>(NotificationsNotifier.new);
 
-class NotificationsNotifier extends StateNotifier<bool> {
-  NotificationsNotifier() : super(true);
+class NotificationsNotifier extends Notifier<bool> {
+  @override
+  bool build() => true;
 
   Future<void> load() async {
     final storage = await StorageService.instance;

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/schedules_api.dart';
-import '../../../../core/providers/api_providers.dart';
+import '../../../../core/models/schedule_models.dart';
 import '../providers/schedules_provider.dart';
 
 class SchedulesPage extends ConsumerStatefulWidget {
@@ -79,7 +78,7 @@ class _SchedulesPageState extends ConsumerState<SchedulesPage> {
   }
 
   Future<void> _toggleSchedule(Schedule schedule) async {
-    final success = await ref.read(schedulesProvider.notifier).toggleSchedule(schedule.id!);
+    final success = await ref.read(schedulesProvider.notifier).toggleSchedule(schedule.id);
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to toggle schedule')),
@@ -88,7 +87,7 @@ class _SchedulesPageState extends ConsumerState<SchedulesPage> {
   }
 
   Future<void> _runScheduleNow(Schedule schedule) async {
-    final taskId = await ref.read(schedulesProvider.notifier).runScheduleNow(schedule.id!);
+    final taskId = await ref.read(schedulesProvider.notifier).runScheduleNow(schedule.id);
     if (taskId != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Schedule started. Task ID: $taskId')),
@@ -121,7 +120,7 @@ class _SchedulesPageState extends ConsumerState<SchedulesPage> {
     );
 
     if (confirmed == true) {
-      final success = await ref.read(schedulesProvider.notifier).deleteSchedule(schedule.id!);
+      final success = await ref.read(schedulesProvider.notifier).deleteSchedule(schedule.id);
       if (!success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to delete schedule')),
@@ -183,7 +182,7 @@ class _ScheduleCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        schedule.playbookName ?? 'Unknown Playbook',
+                        schedule.playbookName,
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.primary,
                         ),
@@ -233,7 +232,7 @@ class _ScheduleCard extends StatelessWidget {
             _InfoRow(
               icon: Icons.schedule,
               label: 'Schedule',
-              value: schedule.cronDescription,
+              value: schedule.cron,
             ),
             if (schedule.nextRun != null)
               _InfoRow(
@@ -251,7 +250,7 @@ class _ScheduleCard extends StatelessWidget {
               _InfoRow(
                 icon: Icons.dns,
                 label: 'Targets',
-                value: '${schedule.targetNodes!.length} node(s)',
+                value: '${schedule.targetNodes!.split(',').length} node(s)',
               ),
           ],
         ),
@@ -259,9 +258,11 @@ class _ScheduleCard extends StatelessWidget {
     );
   }
 
-  String _formatDateTime(DateTime dt) {
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+  String _formatDateTime(String dt) {
+    final parsed = DateTime.tryParse(dt);
+    if (parsed == null) return dt;
+    return '${parsed.year}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')} '
+        '${parsed.hour.toString().padLeft(2, '0')}:${parsed.minute.toString().padLeft(2, '0')}';
   }
 }
 
@@ -414,25 +415,28 @@ class _ScheduleDialogState extends ConsumerState<_ScheduleDialog> {
     try {
       bool success;
       if (widget.schedule != null) {
-        success = await ref.read(schedulesProvider.notifier).updateSchedule(
-          widget.schedule!.id!,
+        final request = ScheduleRequest(
           name: _nameController.text,
+          playbookId: widget.schedule!.playbookId,
           cron: _cronController.text,
           timezone: _timezone,
           enabled: _enabled,
+        );
+        success = await ref.read(schedulesProvider.notifier).updateSchedule(
+          widget.schedule!.id,
+          request,
         );
       } else {
         // For new schedules, we need playbook_id and target_nodes
         // This is a simplified version - in production you'd have a playbook selector
-        final result = await ref.read(schedulesProvider.notifier).createSchedule(
+        final request = ScheduleRequest(
           name: _nameController.text,
           playbookId: 1, // Default playbook ID for demo
           cron: _cronController.text,
           timezone: _timezone,
-          targetNodes: [], // Empty for demo
           enabled: _enabled,
         );
-        success = result != null;
+        success = await ref.read(schedulesProvider.notifier).createSchedule(request);
       }
 
       if (success && mounted) {

@@ -1,11 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../core/services/backup_api.dart';
-import '../../core/providers/api_providers.dart';
+import '../../../../core/models/backup_models.dart';
+import '../../../../core/providers/api_providers.dart';
 
 /// Backup state
 class BackupState {
   final List<Backup> backups;
-  final BackupStatus? status;
+  final BackupSystemStatus? status;
   final bool isLoading;
   final String? error;
 
@@ -18,7 +18,7 @@ class BackupState {
 
   BackupState copyWith({
     List<Backup>? backups,
-    BackupStatus? status,
+    BackupSystemStatus? status,
     bool? isLoading,
     String? error,
   }) {
@@ -31,29 +31,38 @@ class BackupState {
   }
 
   List<Backup> get completedBackups =>
-      backups.where((b) => b.isCompleted).toList();
+      backups.where((b) => b.status == BackupStatusType.completed).toList();
 
   List<Backup> get pendingBackups =>
-      backups.where((b) => b.isPending).toList();
+      backups.where((b) => b.status == BackupStatusType.pending).toList();
 
   List<Backup> get failedBackups =>
-      backups.where((b) => b.isFailed).toList();
+      backups.where((b) => b.status == BackupStatusType.failed).toList();
 }
 
-/// Backup notifier
-class BackupNotifier extends StateNotifier<BackupState> {
-  final BackupApi _api;
+/// Provider for backup state
+final backupProvider =
+    NotifierProvider<BackupNotifier, BackupState>(BackupNotifier.new);
 
-  BackupNotifier(this._api) : super(const BackupState());
+/// Provider for backup status
+final backupStatusProvider = Provider<BackupSystemStatus?>((ref) {
+  return ref.watch(backupProvider).status;
+});
+
+/// Backup notifier
+class BackupNotifier extends Notifier<BackupState> {
+  @override
+  BackupState build() => const BackupState();
 
   Future<void> loadBackups() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final backups = await _api.listBackups();
-      final status = await _api.getStatus();
+      final client = ref.read(apiClientProvider);
+      final listResponse = await client.backup.list();
+      final statusResponse = await client.backup.status();
       state = state.copyWith(
-        backups: backups,
-        status: status,
+        backups: listResponse.data.items,
+        status: statusResponse.data,
         isLoading: false,
       );
     } catch (e) {
@@ -66,21 +75,23 @@ class BackupNotifier extends StateNotifier<BackupState> {
 
   Future<Backup?> createBackup({String? name, String? description}) async {
     try {
-      final backup = await _api.createBackup(
+      final client = ref.read(apiClientProvider);
+      final response = await client.backup.create(
         name: name,
         description: description,
       );
       await loadBackups();
-      return backup;
+      return response.data;
     } catch (e) {
       state = state.copyWith(error: e.toString());
       return null;
     }
   }
 
-  Future<bool> restoreBackup(String id) async {
+  Future<bool> restoreBackup(int id) async {
     try {
-      await _api.restoreBackup(id);
+      final client = ref.read(apiClientProvider);
+      await client.backup.restore(id);
       return true;
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -88,9 +99,10 @@ class BackupNotifier extends StateNotifier<BackupState> {
     }
   }
 
-  Future<bool> deleteBackup(String id) async {
+  Future<bool> deleteBackup(int id) async {
     try {
-      await _api.deleteBackup(id);
+      final client = ref.read(apiClientProvider);
+      await client.backup.delete(id);
       final backups = state.backups.where((b) => b.id != id).toList();
       state = state.copyWith(backups: backups);
       return true;
@@ -102,9 +114,10 @@ class BackupNotifier extends StateNotifier<BackupState> {
 
   Future<int> cleanupBackups({int keepLast = 10}) async {
     try {
-      final deletedCount = await _api.cleanupBackups(keepLast: keepLast);
+      final client = ref.read(apiClientProvider);
+      final response = await client.backup.cleanup(keepLast: keepLast);
       await loadBackups();
-      return deletedCount;
+      return response.data.deletedCount;
     } catch (e) {
       state = state.copyWith(error: e.toString());
       return 0;
@@ -115,15 +128,3 @@ class BackupNotifier extends StateNotifier<BackupState> {
     state = state.copyWith(error: null);
   }
 }
-
-/// Provider for backup state
-final backupProvider =
-    StateNotifierProvider<BackupNotifier, BackupState>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
-  return BackupNotifier(apiClient.backup);
-});
-
-/// Provider for backup status
-final backupStatusProvider = Provider<BackupStatus?>((ref) {
-  return ref.watch(backupProvider).status;
-});

@@ -1,6 +1,4 @@
-import 'package:dio/dio.dart';
-
-/// API Token model
+// Token and Session models for user authentication
 class ApiToken {
   final String id;
   final String name;

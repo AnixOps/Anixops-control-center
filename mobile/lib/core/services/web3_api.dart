@@ -1,6 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'api_client.dart';
 
 /// Web3 API service for blockchain/IPFS integration
 class Web3Api {

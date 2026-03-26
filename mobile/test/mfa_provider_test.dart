@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:anixops_mobile/core/services/mfa_api.dart';
+import 'package:anixops_mobile/core/models/mfa_models.dart';
 import 'package:anixops_mobile/features/settings/presentation/providers/mfa_provider.dart';
 
 void main() {

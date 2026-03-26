@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:anixops_mobile/core/models/ssh_models.dart';
 
 /// SSH API endpoints for server import
 class SshApi {
@@ -7,7 +8,7 @@ class SshApi {
   SshApi(this._dio);
 
   /// Test SSH connection
-  Future<Response> testConnection({
+  Future<SshTestResponse> test({
     required String host,
     required int port,
     required String username,
@@ -16,7 +17,7 @@ class SshApi {
     String? privateKey,
     String? passphrase,
   }) async {
-    return _dio.post('/ssh/test', data: {
+    final response = await _dio.post('/ssh/test', data: {
       'host': host,
       'port': port,
       'username': username,
@@ -25,16 +26,17 @@ class SshApi {
       if (privateKey != null) 'private_key': privateKey,
       if (passphrase != null) 'passphrase': passphrase,
     });
+    return SshTestResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Test SSH connection with password (convenience method)
-  Future<Response> testConnectionWithPassword({
+  Future<SshTestResponse> testWithPassword({
     required String host,
     required int port,
     required String username,
     required String password,
   }) async {
-    return testConnection(
+    return test(
       host: host,
       port: port,
       username: username,
@@ -44,14 +46,14 @@ class SshApi {
   }
 
   /// Test SSH connection with private key (convenience method)
-  Future<Response> testConnectionWithKey({
+  Future<SshTestResponse> testWithKey({
     required String host,
     required int port,
     required String username,
     required String privateKey,
     String? passphrase,
   }) async {
-    return testConnection(
+    return test(
       host: host,
       port: port,
       username: username,
@@ -62,7 +64,7 @@ class SshApi {
   }
 
   /// Import server via SSH
-  Future<Response> importServer({
+  Future<SshImportResponse> import({
     required String host,
     required int port,
     required String username,
@@ -74,7 +76,7 @@ class SshApi {
     String? group,
     List<String>? tags,
   }) async {
-    return _dio.post('/ssh/import', data: {
+    final response = await _dio.post('/ssh/import', data: {
       'host': host,
       'port': port,
       'username': username,
@@ -86,10 +88,11 @@ class SshApi {
       if (group != null) 'group': group,
       if (tags != null) 'tags': tags,
     });
+    return SshImportResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Detect server type via SSH
-  Future<Response> detectServerType({
+  Future<SshDetectResponse> detect({
     required String host,
     required int port,
     required String username,
@@ -98,7 +101,7 @@ class SshApi {
     String? privateKey,
     String? passphrase,
   }) async {
-    return _dio.post('/ssh/detect', data: {
+    final response = await _dio.post('/ssh/detect', data: {
       'host': host,
       'port': port,
       'username': username,
@@ -107,15 +110,17 @@ class SshApi {
       if (privateKey != null) 'private_key': privateKey,
       if (passphrase != null) 'passphrase': passphrase,
     });
+    return SshDetectResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Execute command via SSH
-  Future<Response> executeCommand({
+  Future<SshExecuteResponse> execute({
     required String nodeId,
     required String command,
   }) async {
-    return _dio.post('/nodes/$nodeId/execute', data: {
+    final response = await _dio.post('/nodes/$nodeId/execute', data: {
       'command': command,
     });
+    return SshExecuteResponse.fromJson(response.data as Map<String, dynamic>);
   }
 }

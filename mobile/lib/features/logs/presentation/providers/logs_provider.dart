@@ -117,9 +117,13 @@ class LogsState {
   Set<String> get sources => logs.map((log) => log.source).toSet();
 }
 
+/// Provider for LogsState
+final logsProvider = NotifierProvider<LogsNotifier, LogsState>(LogsNotifier.new);
+
 /// Logs notifier
-class LogsNotifier extends StateNotifier<LogsState> {
-  LogsNotifier() : super(const LogsState());
+class LogsNotifier extends Notifier<LogsState> {
+  @override
+  LogsState build() => const LogsState();
 
   /// Load logs from API
   Future<void> loadLogs() async {
@@ -226,8 +230,3 @@ class LogsNotifier extends StateNotifier<LogsState> {
     ];
   }
 }
-
-/// Provider for LogsState
-final logsProvider = StateNotifierProvider<LogsNotifier, LogsState>((ref) {
-  return LogsNotifier();
-});

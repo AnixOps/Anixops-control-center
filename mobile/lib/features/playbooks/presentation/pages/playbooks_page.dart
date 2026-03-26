@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/services/playbooks_api.dart';
+import '../../../../core/models/playbook_models.dart';
 import '../providers/playbooks_provider.dart';
 import 'playbook_detail_page.dart';
 
@@ -17,20 +17,6 @@ class PlaybooksPage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Playbooks'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.sync),
-            tooltip: 'Sync Built-in',
-            onPressed: () async {
-              final success = await ref.read(playbooksProvider.notifier).syncBuiltIn();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(success ? 'Built-in playbooks synced' : 'Sync failed'),
-                  ),
-                );
-              }
-            },
-          ),
           IconButton(
             icon: const Icon(Icons.add),
             tooltip: 'Upload Playbook',
@@ -170,7 +156,7 @@ class PlaybooksPage extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Playbook'),
-        content: Text('Are you sure you want to delete "${playbook.title}"?'),
+        content: Text('Are you sure you want to delete "${playbook.name}"?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -265,7 +251,7 @@ class PlaybooksPage extends ConsumerWidget {
                 Navigator.pop(context);
                 final success = await ref.read(playbooksProvider.notifier).uploadPlaybook(
                       name: nameController.text,
-                      content: contentController.text,
+                      storageKey: 'uploads/${nameController.text}.yml',
                       description: descriptionController.text,
                       category: selectedCategory,
                     );
@@ -366,7 +352,7 @@ class _PlaybookCard extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            playbook.title,
+                            playbook.name,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.bold,
                             ),

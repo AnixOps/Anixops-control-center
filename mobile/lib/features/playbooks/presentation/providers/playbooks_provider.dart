@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/playbooks_api.dart';
+import '../../../../core/models/playbook_models.dart';
 import '../../../../core/providers/api_providers.dart';
 
 /// Playbooks state
@@ -38,10 +38,8 @@ class PlaybooksState {
     );
   }
 
-  /// Get all playbooks (custom + built-in)
   List<Playbook> get allPlaybooks => [...builtInPlaybooks, ...playbooks];
 
-  /// Get playbooks filtered by category
   List<Playbook> get filteredPlaybooks {
     if (selectedCategory == null || selectedCategory == 'all') {
       return allPlaybooks;
@@ -50,29 +48,28 @@ class PlaybooksState {
   }
 }
 
-/// Playbooks notifier
-class PlaybooksNotifier extends StateNotifier<PlaybooksState> {
-  final PlaybooksApi _api;
+/// Provider for PlaybooksState
+final playbooksProvider = NotifierProvider<PlaybooksNotifier, PlaybooksState>(PlaybooksNotifier.new);
 
-  PlaybooksNotifier(this._api) : super(const PlaybooksState()) {
-    loadAll();
+/// Playbooks notifier
+class PlaybooksNotifier extends Notifier<PlaybooksState> {
+  @override
+  PlaybooksState build() {
+    Future.microtask(() => loadAll());
+    return const PlaybooksState();
   }
 
-  /// Load all playbooks data
   Future<void> loadAll() async {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final results = await Future.wait([
-        _api.getPlaybooks(),
-        _api.getBuiltInPlaybooks(),
-        _api.getCategories(),
-      ]);
+      final client = ref.read(apiClientProvider);
+      final response = await client.playbooks.list();
 
       state = state.copyWith(
-        playbooks: results[0] as List<Playbook>,
-        builtInPlaybooks: results[1] as List<Playbook>,
-        categories: results[2] as List<PlaybookCategory>,
+        playbooks: response.data.items,
+        builtInPlaybooks: [], // No built-in playbooks endpoint yet
+        categories: [],
         isLoading: false,
       );
     } catch (e) {
@@ -83,32 +80,36 @@ class PlaybooksNotifier extends StateNotifier<PlaybooksState> {
     }
   }
 
-  /// Set selected category filter
   void setCategory(String? category) {
     state = state.copyWith(selectedCategory: category);
   }
 
-  /// Get single playbook
-  Future<Playbook> getPlaybook(String name) async {
-    return await _api.getPlaybook(name);
+  Future<Playbook?> getPlaybook(String name) async {
+    try {
+      final client = ref.read(apiClientProvider);
+      final response = await client.playbooks.get(name);
+      return response.data;
+    } catch (e) {
+      return null;
+    }
   }
 
-  /// Upload playbook
   Future<bool> uploadPlaybook({
     required String name,
-    required String content,
+    required String storageKey,
     String? description,
     String? category,
   }) async {
     try {
-      final playbook = await _api.uploadPlaybook(
+      final client = ref.read(apiClientProvider);
+      final response = await client.playbooks.create(
         name: name,
-        content: content,
+        storageKey: storageKey,
         description: description,
         category: category ?? 'custom',
       );
       state = state.copyWith(
-        playbooks: [...state.playbooks, playbook],
+        playbooks: [...state.playbooks, response.data],
       );
       return true;
     } catch (e) {
@@ -117,10 +118,10 @@ class PlaybooksNotifier extends StateNotifier<PlaybooksState> {
     }
   }
 
-  /// Delete playbook
   Future<bool> deletePlaybook(String name) async {
     try {
-      await _api.deletePlaybook(name);
+      final client = ref.read(apiClientProvider);
+      await client.playbooks.delete(name);
       state = state.copyWith(
         playbooks: state.playbooks.where((p) => p.name != name).toList(),
       );
@@ -131,26 +132,22 @@ class PlaybooksNotifier extends StateNotifier<PlaybooksState> {
     }
   }
 
-  /// Sync built-in playbooks
-  Future<bool> syncBuiltIn() async {
-    try {
-      await _api.syncBuiltIn();
-      await loadAll();
-      return true;
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-      return false;
-    }
-  }
-
-  /// Clear error
   void clearError() {
     state = state.copyWith(error: null);
   }
 }
 
-/// Provider for PlaybooksState
-final playbooksProvider = StateNotifierProvider<PlaybooksNotifier, PlaybooksState>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return PlaybooksNotifier(client.playbooks);
-});
+/// Playbook category placeholder
+class PlaybookCategory {
+  final String id;
+  final String name;
+  final String? icon;
+  final String? description;
+
+  const PlaybookCategory({
+    required this.id,
+    required this.name,
+    this.icon,
+    this.description,
+  });
+}

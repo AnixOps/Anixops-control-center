@@ -1,4 +1,6 @@
 import 'package:dio/dio.dart';
+import 'package:anixops_mobile/core/models/plugin_models.dart';
+import 'package:anixops_mobile/core/models/api_response.dart';
 
 /// Plugins API endpoints
 class PluginsApi {
@@ -7,65 +9,77 @@ class PluginsApi {
   PluginsApi(this._dio);
 
   /// List all plugins
-  Future<Response> list() async {
-    return _dio.get('/plugins');
+  Future<PluginListResponse> list() async {
+    final response = await _dio.get('/plugins');
+    return PluginListResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Get a single plugin by name
-  Future<Response> get(String name) async {
-    return _dio.get('/plugins/$name');
+  Future<PluginDetailResponse> get(String name) async {
+    final response = await _dio.get('/plugins/$name');
+    return PluginDetailResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Execute a plugin action
-  Future<Response> execute(String name, String action, {Map<String, dynamic>? params}) async {
-    return _dio.post('/plugins/$name/execute', data: {
+  Future<PluginExecuteResponse> execute(String name, String action, {Map<String, dynamic>? params}) async {
+    final response = await _dio.post('/plugins/$name/execute', data: {
       'action': action,
       'params': params ?? {},
     });
+    return PluginExecuteResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Get plugin status
-  Future<Response> status(String name) async {
-    return _dio.get('/plugins/$name/status');
+  Future<PluginStatusResponse> status(String name) async {
+    final response = await _dio.get('/plugins/$name/status');
+    return PluginStatusResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Get plugin configuration
-  Future<Response> config(String name) async {
-    return _dio.get('/plugins/$name/config');
+  Future<Map<String, dynamic>> config(String name) async {
+    final response = await _dio.get('/plugins/$name/config');
+    return response.data['data'] as Map<String, dynamic>;
   }
 
   /// Update plugin configuration
-  Future<Response> updateConfig(String name, Map<String, dynamic> config) async {
-    return _dio.put('/plugins/$name/config', data: config);
+  Future<ApiMessageResponse> updateConfig(String name, Map<String, dynamic> config) async {
+    final response = await _dio.put('/plugins/$name/config', data: config);
+    return ApiMessageResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Enable a plugin
-  Future<Response> enable(String name) async {
-    return _dio.post('/plugins/$name/enable');
+  Future<ApiMessageResponse> enable(String name) async {
+    final response = await _dio.post('/plugins/$name/enable');
+    return ApiMessageResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Disable a plugin
-  Future<Response> disable(String name) async {
-    return _dio.post('/plugins/$name/disable');
+  Future<ApiMessageResponse> disable(String name) async {
+    final response = await _dio.post('/plugins/$name/disable');
+    return ApiMessageResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Start a plugin
-  Future<Response> start(String name) async {
-    return _dio.post('/plugins/$name/start');
+  Future<ApiMessageResponse> start(String name) async {
+    final response = await _dio.post('/plugins/$name/start');
+    return ApiMessageResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Stop a plugin
-  Future<Response> stop(String name) async {
-    return _dio.post('/plugins/$name/stop');
+  Future<ApiMessageResponse> stop(String name) async {
+    final response = await _dio.post('/plugins/$name/stop');
+    return ApiMessageResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Restart a plugin
-  Future<Response> restart(String name) async {
-    return _dio.post('/plugins/$name/restart');
+  Future<ApiMessageResponse> restart(String name) async {
+    final response = await _dio.post('/plugins/$name/restart');
+    return ApiMessageResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Get plugin logs
-  Future<Response> logs(String name, {int limit = 100}) async {
-    return _dio.get('/plugins/$name/logs', queryParameters: {'limit': limit});
+  Future<List<String>> logs(String name, {int limit = 100}) async {
+    final response = await _dio.get('/plugins/$name/logs', queryParameters: {'limit': limit});
+    return (response.data['data'] as List).map((e) => e as String).toList();
   }
 }

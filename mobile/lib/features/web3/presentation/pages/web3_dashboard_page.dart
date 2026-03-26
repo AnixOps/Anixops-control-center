@@ -2,10 +2,37 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:anixops_mobile/core/services/api_client.dart';
 
-/// Wallet connection state
-final walletAddressProvider = StateProvider<String?>((ref) => null);
-final didProvider = StateProvider<String?>((ref) => null);
-final isConnectingProvider = StateProvider<bool>((ref) => false);
+/// Wallet connection state providers
+final walletAddressProvider = NotifierProvider<WalletAddressNotifier, String?>(WalletAddressNotifier.new);
+final didProvider = NotifierProvider<DIDNotifier, String?>(DIDNotifier.new);
+final isConnectingProvider = NotifierProvider<IsConnectingNotifier, bool>(IsConnectingNotifier.new);
+
+class WalletAddressNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void setAddress(String? address) {
+    state = address;
+  }
+}
+
+class DIDNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  void setDID(String? did) {
+    state = did;
+  }
+}
+
+class IsConnectingNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void setConnecting(bool value) {
+    state = value;
+  }
+}
 
 /// Web3 Dashboard Page
 class Web3DashboardPage extends ConsumerStatefulWidget {
@@ -45,15 +72,15 @@ class _Web3DashboardPageState extends ConsumerState<Web3DashboardPage> {
   }
 
   Future<void> _connectWallet() async {
-    ref.read(isConnectingProvider.notifier).state = true;
+    ref.read(isConnectingProvider.notifier).setConnecting(true);
 
     try {
       // Simulate wallet connection
       // In production, this would use walletconnect or web3dart
       const mockAddress = '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18';
 
-      ref.read(walletAddressProvider.notifier).state = mockAddress;
-      ref.read(didProvider.notifier).state = _generateDID(mockAddress);
+      ref.read(walletAddressProvider.notifier).setAddress(mockAddress);
+      ref.read(didProvider.notifier).setDID(_generateDID(mockAddress));
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -67,7 +94,7 @@ class _Web3DashboardPageState extends ConsumerState<Web3DashboardPage> {
         );
       }
     } finally {
-      ref.read(isConnectingProvider.notifier).state = false;
+      ref.read(isConnectingProvider.notifier).setConnecting(false);
     }
   }
 

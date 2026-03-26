@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/tasks_api.dart';
+import '../../../../core/models/task_models.dart';
 import '../../../../core/providers/api_providers.dart';
 
 /// Tasks state
 class TasksState {
-  final List<Task> tasks;
-  final Task? selectedTask;
+  final List<TaskListItem> tasks;
+  final TaskDetailResponseData? selectedTask;
   final List<TaskLog> taskLogs;
   final bool isLoading;
   final bool isLoadingLogs;
@@ -30,8 +30,8 @@ class TasksState {
   });
 
   TasksState copyWith({
-    List<Task>? tasks,
-    Task? selectedTask,
+    List<TaskListItem>? tasks,
+    TaskDetailResponseData? selectedTask,
     List<TaskLog>? taskLogs,
     bool? isLoading,
     bool? isLoadingLogs,
@@ -55,27 +55,30 @@ class TasksState {
     );
   }
 
-  List<Task> get filteredTasks {
+  List<TaskListItem> get filteredTasks {
     if (statusFilter == null || statusFilter == 'all') {
       return tasks;
     }
-    return tasks.where((t) => t.status == statusFilter).toList();
+    return tasks.where((t) => t.status.name == statusFilter).toList();
   }
 }
 
+/// Provider for TasksState
+final tasksProvider = NotifierProvider<TasksNotifier, TasksState>(TasksNotifier.new);
+
 /// Tasks notifier
-class TasksNotifier extends StateNotifier<TasksState> {
-  final TasksApi _api;
-  final Ref _ref;
+class TasksNotifier extends Notifier<TasksState> {
   StreamSubscription<bool>? _connectionSubscription;
 
-  TasksNotifier(this._api, this._ref) : super(const TasksState()) {
+  @override
+  TasksState build() {
     _bindRealtimeUpdates();
-    loadTasks();
+    Future.microtask(() => loadTasks());
+    return const TasksState();
   }
 
   void _bindRealtimeUpdates() {
-    final sse = _ref.read(sseServiceProvider);
+    final sse = ref.read(sseServiceProvider);
 
     sse.on('task_update', _handleTaskUpdate);
     sse.on('log', _handleTaskLog);
@@ -99,33 +102,55 @@ class TasksNotifier extends StateNotifier<TasksState> {
     final updatedTasks = state.tasks.map((task) {
       if (task.taskId != taskId) return task;
 
-      return Task(
+      return TaskListItem(
+        id: task.id,
         taskId: task.taskId,
         playbookId: task.playbookId,
         playbookName: task.playbookName,
-        status: payload['status']?.toString() ?? task.status,
+        status: payload['status'] != null
+            ? TaskStatus.values.firstWhere((e) => e.name == payload['status'],
+                orElse: () => task.status)
+            : task.status,
         triggerType: task.triggerType,
         triggeredBy: task.triggeredBy,
-        triggeredByEmail: task.triggeredByEmail,
         targetNodes: task.targetNodes,
         variables: task.variables,
-        result: payload['result'] is Map<String, dynamic>
-            ? payload['result'] as Map<String, dynamic>
-            : task.result,
+        result: payload['result']?.toString() ?? task.result,
         error: payload['error']?.toString() ?? task.error,
-        createdAt: task.createdAt,
         startedAt: task.startedAt,
         completedAt: task.completedAt,
+        createdAt: task.createdAt,
         category: task.category,
+        triggeredByEmail: task.triggeredByEmail,
       );
     }).toList();
 
-    Task? updatedSelectedTask = state.selectedTask;
+    TaskDetailResponseData? updatedSelectedTask = state.selectedTask;
     if (updatedSelectedTask?.taskId == taskId) {
-      updatedSelectedTask = updatedTasks.firstWhere(
+      final updated = updatedTasks.firstWhere(
         (task) => task.taskId == taskId,
-        orElse: () => updatedSelectedTask!,
+        orElse: () => updatedTasks.first,
       );
+      if (updated != null) {
+        updatedSelectedTask = TaskDetailResponseData(
+          id: updated.id,
+          taskId: updated.taskId,
+          playbookId: updated.playbookId,
+          playbookName: updated.playbookName,
+          status: updated.status,
+          triggerType: updated.triggerType,
+          triggeredBy: updated.triggeredBy,
+          targetNodes: updated.targetNodes,
+          variables: updated.variables,
+          result: updated.result,
+          error: updated.error,
+          startedAt: updated.startedAt,
+          completedAt: updated.completedAt,
+          createdAt: updated.createdAt,
+          category: updated.category,
+          triggeredByEmail: updated.triggeredByEmail,
+        );
+      }
     }
 
     state = state.copyWith(tasks: updatedTasks, selectedTask: updatedSelectedTask);
@@ -138,7 +163,17 @@ class TasksNotifier extends StateNotifier<TasksState> {
     if (taskId == null || taskId.isEmpty) return;
     if (state.selectedTask?.taskId != taskId) return;
 
-    final log = TaskLog.fromJson(Map<String, dynamic>.from(payload));
+    final log = TaskLog(
+      id: payload['id'] as int? ?? 0,
+      taskId: taskId,
+      nodeId: payload['node_id'] as int?,
+      nodeName: payload['node_name'] as String?,
+      level: TaskLogLevel.values.firstWhere((e) => e.name == payload['level'],
+          orElse: () => TaskLogLevel.info),
+      message: payload['message'] as String? ?? '',
+      metadata: payload['metadata'] as String?,
+      createdAt: payload['created_at'] as String? ?? '',
+    );
     state = state.copyWith(taskLogs: [...state.taskLogs, log]);
   }
 
@@ -147,15 +182,18 @@ class TasksNotifier extends StateNotifier<TasksState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final tasks = await _api.getTasks(
+      final client = ref.read(apiClientProvider);
+      final response = await client.tasks.list(
         page: page,
         status: status ?? state.statusFilter,
       );
 
       state = state.copyWith(
-        tasks: tasks,
+        tasks: response.data.items,
         isLoading: false,
         currentPage: page,
+        total: response.data.total,
+        totalPages: response.data.totalPages,
       );
     } catch (e) {
       state = state.copyWith(
@@ -176,9 +214,10 @@ class TasksNotifier extends StateNotifier<TasksState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final task = await _api.getTask(taskId);
+      final client = ref.read(apiClientProvider);
+      final response = await client.tasks.get(taskId);
       state = state.copyWith(
-        selectedTask: task,
+        selectedTask: response.data,
         isLoading: false,
       );
     } catch (e) {
@@ -194,9 +233,10 @@ class TasksNotifier extends StateNotifier<TasksState> {
     state = state.copyWith(isLoadingLogs: true);
 
     try {
-      final logs = await _api.getTaskLogs(taskId);
+      final client = ref.read(apiClientProvider);
+      final response = await client.tasks.logs(taskId);
       state = state.copyWith(
-        taskLogs: logs,
+        taskLogs: response.data,
         isLoadingLogs: false,
       );
     } catch (e) {
@@ -205,31 +245,31 @@ class TasksNotifier extends StateNotifier<TasksState> {
   }
 
   /// Create task
-  Future<Task?> createTask({
-    int? playbookId,
-    String? playbookName,
-    required List<dynamic> targetNodes,
+  Future<bool> createTask({
+    required int playbookId,
+    required List<int> targetNodeIds,
     Map<String, dynamic>? variables,
   }) async {
     try {
-      final task = await _api.createTask(
+      final client = ref.read(apiClientProvider);
+      await client.tasks.create(
         playbookId: playbookId,
-        playbookName: playbookName,
-        targetNodes: targetNodes,
+        targetNodeIds: targetNodeIds,
         variables: variables,
       );
       await loadTasks();
-      return task;
+      return true;
     } catch (e) {
       state = state.copyWith(error: e.toString());
-      return null;
+      return false;
     }
   }
 
   /// Cancel task
   Future<bool> cancelTask(String taskId) async {
     try {
-      await _api.cancelTask(taskId);
+      final client = ref.read(apiClientProvider);
+      await client.tasks.cancel(taskId);
       await loadTasks();
       if (state.selectedTask?.taskId == taskId) {
         await loadTask(taskId);
@@ -242,14 +282,15 @@ class TasksNotifier extends StateNotifier<TasksState> {
   }
 
   /// Retry task
-  Future<Task?> retryTask(String taskId) async {
+  Future<bool> retryTask(String taskId) async {
     try {
-      final task = await _api.retryTask(taskId);
+      final client = ref.read(apiClientProvider);
+      await client.tasks.retry(taskId);
       await loadTasks();
-      return task;
+      return true;
     } catch (e) {
       state = state.copyWith(error: e.toString());
-      return null;
+      return false;
     }
   }
 
@@ -260,19 +301,4 @@ class TasksNotifier extends StateNotifier<TasksState> {
       taskLogs: const [],
     );
   }
-
-  @override
-  void dispose() {
-    final sse = _ref.read(sseServiceProvider);
-    sse.off('task_update', _handleTaskUpdate);
-    sse.off('log', _handleTaskLog);
-    _connectionSubscription?.cancel();
-    super.dispose();
-  }
 }
-
-/// Provider for TasksState
-final tasksProvider = StateNotifierProvider<TasksNotifier, TasksState>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return TasksNotifier(client.tasks, ref);
-});

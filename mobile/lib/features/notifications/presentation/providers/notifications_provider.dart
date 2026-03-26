@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/notifications_api.dart';
+import '../../../../core/models/notification_models.dart';
 import '../../../../core/providers/api_providers.dart';
 
 /// Notifications state
@@ -37,20 +37,28 @@ class NotificationsState {
       notifications.where((n) => n.read).toList();
 }
 
-/// Notifications notifier
-class NotificationsNotifier extends StateNotifier<NotificationsState> {
-  final NotificationsApi _api;
+/// Provider for notifications
+final notificationsProvider = NotifierProvider<NotificationsNotifier, NotificationsState>(NotificationsNotifier.new);
 
-  NotificationsNotifier(this._api) : super(const NotificationsState());
+/// Provider for unread count
+final unreadCountProvider = Provider<int>((ref) {
+  return ref.watch(notificationsProvider).unreadCount;
+});
+
+/// Notifications notifier
+class NotificationsNotifier extends Notifier<NotificationsState> {
+  @override
+  NotificationsState build() => const NotificationsState();
 
   Future<void> loadNotifications() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final notifications = await _api.getNotifications();
+      final client = ref.read(apiClientProvider);
+      final response = await client.notifications.list();
       state = state.copyWith(
-        notifications: notifications,
+        notifications: response.data.items,
         isLoading: false,
-        unreadCount: notifications.where((n) => !n.read).length,
+        unreadCount: response.data.unreadCount,
       );
     } catch (e) {
       state = state.copyWith(
@@ -60,19 +68,23 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     }
   }
 
-  Future<void> markAsRead(String id) async {
+  Future<void> markAsRead(int id) async {
     try {
-      await _api.markAsRead(id);
+      final client = ref.read(apiClientProvider);
+      await client.notifications.markAsRead(id);
       final notifications = state.notifications.map((n) {
         if (n.id == id) {
           return Notification(
             id: n.id,
+            userId: n.userId,
+            type: n.type,
             title: n.title,
             message: n.message,
-            type: n.type,
+            resourceType: n.resourceType,
+            resourceId: n.resourceId,
             read: true,
+            actionUrl: n.actionUrl,
             createdAt: n.createdAt,
-            metadata: n.metadata,
           );
         }
         return n;
@@ -82,22 +94,26 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
         unreadCount: notifications.where((n) => !n.read).length,
       );
     } catch (e) {
-      // Ignore error, still update UI
+      // Ignore error
     }
   }
 
   Future<void> markAllAsRead() async {
     try {
-      await _api.markAllAsRead();
+      final client = ref.read(apiClientProvider);
+      await client.notifications.markAllAsRead();
       final notifications = state.notifications.map((n) {
         return Notification(
           id: n.id,
+          userId: n.userId,
+          type: n.type,
           title: n.title,
           message: n.message,
-          type: n.type,
+          resourceType: n.resourceType,
+          resourceId: n.resourceId,
           read: true,
+          actionUrl: n.actionUrl,
           createdAt: n.createdAt,
-          metadata: n.metadata,
         );
       }).toList();
       state = state.copyWith(
@@ -105,13 +121,14 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
         unreadCount: 0,
       );
     } catch (e) {
-      // Ignore error, still update UI
+      // Ignore error
     }
   }
 
-  Future<void> deleteNotification(String id) async {
+  Future<void> deleteNotification(int id) async {
     try {
-      await _api.deleteNotification(id);
+      final client = ref.read(apiClientProvider);
+      await client.notifications.delete(id);
       final notifications = state.notifications.where((n) => n.id != id).toList();
       state = state.copyWith(
         notifications: notifications,
@@ -129,9 +146,10 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
 
   Future<int> fetchUnreadCount() async {
     try {
-      final count = await _api.getUnreadCount();
-      state = state.copyWith(unreadCount: count);
-      return count;
+      final client = ref.read(apiClientProvider);
+      final response = await client.notifications.unreadCount();
+      state = state.copyWith(unreadCount: response.data);
+      return response.data;
     } catch (e) {
       return state.unreadCount;
     }
@@ -141,15 +159,3 @@ class NotificationsNotifier extends StateNotifier<NotificationsState> {
     state = state.copyWith(error: null);
   }
 }
-
-/// Provider for notifications
-final notificationsProvider =
-    StateNotifierProvider<NotificationsNotifier, NotificationsState>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
-  return NotificationsNotifier(apiClient.notifications);
-});
-
-/// Provider for unread count (can be watched separately)
-final unreadCountProvider = Provider<int>((ref) {
-  return ref.watch(notificationsProvider).unreadCount;
-});

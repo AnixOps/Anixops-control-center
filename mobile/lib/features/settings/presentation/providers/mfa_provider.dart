@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/mfa_api.dart';
+import '../../../../core/models/mfa_models.dart';
 import '../../../../core/providers/api_providers.dart';
 
 /// MFA state
@@ -31,12 +31,15 @@ class MFAState {
   }
 }
 
-/// MFA notifier
-class MFANotifier extends StateNotifier<MFAState> {
-  final MFAApi _api;
+/// Provider for MFAState
+final mfaProvider = NotifierProvider<MFANotifier, MFAState>(MFANotifier.new);
 
-  MFANotifier(this._api) : super(const MFAState()) {
-    loadStatus();
+/// MFA notifier
+class MFANotifier extends Notifier<MFAState> {
+  @override
+  MFAState build() {
+    Future.microtask(() => loadStatus());
+    return const MFAState();
   }
 
   /// Load MFA status
@@ -44,9 +47,10 @@ class MFANotifier extends StateNotifier<MFAState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final status = await _api.getStatus();
+      final client = ref.read(apiClientProvider);
+      final response = await client.mfa.status();
       state = state.copyWith(
-        status: status,
+        status: response.data,
         isLoading: false,
       );
     } catch (e) {
@@ -62,12 +66,13 @@ class MFANotifier extends StateNotifier<MFAState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final result = await _api.setup();
+      final client = ref.read(apiClientProvider);
+      final response = await client.mfa.setup();
       state = state.copyWith(
-        setupResult: result,
+        setupResult: response.data,
         isLoading: false,
       );
-      return result;
+      return response.data;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -82,17 +87,18 @@ class MFANotifier extends StateNotifier<MFAState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final success = await _api.enable(code);
-      if (success) {
+      final client = ref.read(apiClientProvider);
+      final response = await client.mfa.enable(code);
+      if (response.data.success) {
         await loadStatus();
         state = state.copyWith(setupResult: null);
       } else {
         state = state.copyWith(
           isLoading: false,
-          error: 'Invalid verification code',
+          error: response.data.message ?? 'Invalid verification code',
         );
       }
-      return success;
+      return response.data.success;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -107,16 +113,17 @@ class MFANotifier extends StateNotifier<MFAState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final success = await _api.disable(code);
-      if (success) {
+      final client = ref.read(apiClientProvider);
+      final response = await client.mfa.disable(code);
+      if (response.data.success) {
         await loadStatus();
       } else {
         state = state.copyWith(
           isLoading: false,
-          error: 'Invalid verification code',
+          error: response.data.message ?? 'Invalid verification code',
         );
       }
-      return success;
+      return response.data.success;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -131,9 +138,10 @@ class MFANotifier extends StateNotifier<MFAState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final codes = await _api.regenerateRecoveryCodes(code);
+      final client = ref.read(apiClientProvider);
+      final response = await client.mfa.regenerateRecoveryCodes(code);
       state = state.copyWith(isLoading: false);
-      return codes;
+      return response.data.recoveryCodes;
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
@@ -153,9 +161,3 @@ class MFANotifier extends StateNotifier<MFAState> {
     state = state.copyWith(setupResult: null);
   }
 }
-
-/// Provider for MFAState
-final mfaProvider = StateNotifierProvider<MFANotifier, MFAState>((ref) {
-  final client = ref.watch(apiClientProvider);
-  return MFANotifier(client.mfa);
-});

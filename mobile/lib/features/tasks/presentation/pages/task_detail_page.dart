@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/tasks_api.dart';
+import '../../../../core/models/task_models.dart';
 import '../providers/tasks_provider.dart';
 
 class TaskDetailPage extends ConsumerStatefulWidget {
@@ -32,13 +32,13 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
       appBar: AppBar(
         title: const Text('Task Details'),
         actions: [
-          if (task != null && (task.status == 'pending' || task.status == 'running'))
+          if (task != null && (task.status == TaskStatus.pending || task.status == TaskStatus.running))
             IconButton(
               icon: const Icon(Icons.cancel),
               tooltip: 'Cancel',
               onPressed: () => _cancelTask(context, task.taskId),
             ),
-          if (task != null && (task.status == 'failed' || task.status == 'cancelled'))
+          if (task != null && (task.status == TaskStatus.failed || task.status == TaskStatus.cancelled))
             IconButton(
               icon: const Icon(Icons.refresh),
               tooltip: 'Retry',
@@ -67,7 +67,7 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     );
   }
 
-  Widget _buildContent(BuildContext context, Task task, TasksState state, ThemeData theme) {
+  Widget _buildContent(BuildContext context, TaskDetailResponseData task, TasksState state, ThemeData theme) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -100,34 +100,31 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     );
   }
 
-  Widget _buildStatusCard(Task task, ThemeData theme) {
+  Widget _buildStatusCard(TaskDetailResponseData task, ThemeData theme) {
     Color statusColor;
     IconData statusIcon;
 
     switch (task.status) {
-      case 'pending':
+      case TaskStatus.pending:
         statusColor = Colors.grey;
         statusIcon = Icons.schedule;
         break;
-      case 'running':
+      case TaskStatus.running:
         statusColor = Colors.blue;
         statusIcon = Icons.play_circle;
         break;
-      case 'success':
+      case TaskStatus.success:
         statusColor = Colors.green;
         statusIcon = Icons.check_circle;
         break;
-      case 'failed':
+      case TaskStatus.failed:
         statusColor = Colors.red;
         statusIcon = Icons.error;
         break;
-      case 'cancelled':
+      case TaskStatus.cancelled:
         statusColor = Colors.orange;
         statusIcon = Icons.cancel;
         break;
-      default:
-        statusColor = Colors.grey;
-        statusIcon = Icons.help;
     }
 
     return Card(
@@ -154,14 +151,14 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    task.title,
+                    task.playbookName,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    task.playbookName ?? 'Unknown playbook',
+                    task.playbookName,
                     style: theme.textTheme.bodyMedium,
                   ),
                   const SizedBox(height: 4),
@@ -178,7 +175,7 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     );
   }
 
-  Widget _buildInfoCard(Task task, ThemeData theme) {
+  Widget _buildInfoCard(TaskDetailResponseData task, ThemeData theme) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -187,16 +184,15 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
           children: [
             Text('Task Information', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
-            _buildInfoRow('Status', task.status.toUpperCase(), theme),
-            _buildInfoRow('Trigger', task.triggerType, theme),
+            _buildInfoRow('Status', task.status.name.toUpperCase(), theme),
+            _buildInfoRow('Trigger', task.triggerType.name, theme),
             if (task.triggeredByEmail != null)
               _buildInfoRow('Triggered by', task.triggeredByEmail!, theme),
-            if (task.createdAt != null)
-              _buildInfoRow('Created', _formatDateTime(task.createdAt!), theme),
+            _buildInfoRow('Created', task.createdAt, theme),
             if (task.startedAt != null)
-              _buildInfoRow('Started', _formatDateTime(task.startedAt!), theme),
+              _buildInfoRow('Started', task.startedAt!, theme),
             if (task.completedAt != null)
-              _buildInfoRow('Completed', _formatDateTime(task.completedAt!), theme),
+              _buildInfoRow('Completed', task.completedAt!, theme),
           ],
         ),
       ),
@@ -216,7 +212,10 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     );
   }
 
-  Widget _buildNodesCard(Task task, ThemeData theme) {
+  Widget _buildNodesCard(TaskDetailResponseData task, ThemeData theme) {
+    // targetNodes is a String, parse it or display as-is
+    final nodeNames = task.targetNodes!.split(',').where((s) => s.trim().isNotEmpty).toList();
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -234,7 +233,7 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
-                    '${task.targetNodes?.length ?? 0} nodes',
+                    '${nodeNames.length} nodes',
                     style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
                   ),
                 ),
@@ -244,7 +243,7 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: task.targetNodes!.map((node) {
+              children: nodeNames.map((nodeName) {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
@@ -256,7 +255,7 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
                     children: [
                       const Icon(Icons.computer, size: 16),
                       const SizedBox(width: 4),
-                      Text(node.name),
+                      Text(nodeName.trim()),
                     ],
                   ),
                 );
@@ -268,7 +267,7 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     );
   }
 
-  Widget _buildErrorCard(Task task, ThemeData theme) {
+  Widget _buildErrorCard(TaskDetailResponseData task, ThemeData theme) {
     return Card(
       color: Colors.red.withValues(alpha: 0.1),
       child: Padding(
@@ -339,10 +338,10 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
                   children: state.taskLogs.take(50).map((log) {
                     Color logColor;
                     switch (log.level) {
-                      case 'error':
+                      case TaskLogLevel.error:
                         logColor = Colors.red;
                         break;
-                      case 'warning':
+                      case TaskLogLevel.warning:
                         logColor = Colors.orange;
                         break;
                       default:
@@ -369,11 +368,6 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
         ),
       ),
     );
-  }
-
-  String _formatDateTime(DateTime dt) {
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
-           '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 
   Future<void> _cancelTask(BuildContext context, String taskId) async {
@@ -407,11 +401,11 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
   }
 
   Future<void> _retryTask(BuildContext context, String taskId) async {
-    final task = await ref.read(tasksProvider.notifier).retryTask(taskId);
+    final success = await ref.read(tasksProvider.notifier).retryTask(taskId);
     if (context.mounted) {
-      if (task != null) {
+      if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Task retry created: ${task.taskId}')),
+          const SnackBar(content: Text('Task retry created')),
         );
         // Navigate to new task
         Navigator.pop(context);

@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:anixops_mobile/core/services/api_client.dart';
 import 'package:anixops_mobile/core/services/sse_service.dart';
 import 'package:anixops_mobile/core/providers/api_providers.dart';
+import 'package:anixops_mobile/core/models/auth_models.dart';
 
 class AuthState {
   final bool isAuthenticated;
@@ -49,10 +50,18 @@ class AuthState {
   }
 }
 
-class AuthNotifier extends StateNotifier<AuthState> {
-  final ApiClient _apiClient;
-  final SharedPreferences _prefs;
-  final SSEService _sseService;
+// Provider for SharedPreferences
+final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
+  throw UnimplementedError('SharedPreferences must be overridden');
+});
+
+// Auth state provider
+final authStateProvider = NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
+
+class AuthNotifier extends Notifier<AuthState> {
+  late final ApiClient _apiClient;
+  late final SharedPreferences _prefs;
+  late final SSEService _sseService;
 
   static const String _tokenKey = 'auth_token';
   static const String _refreshTokenKey = 'refresh_token';
@@ -60,8 +69,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   static const String _emailKey = 'user_email';
   static const String _roleKey = 'user_role';
 
-  AuthNotifier(this._apiClient, this._prefs, this._sseService) : super(const AuthState()) {
+  @override
+  AuthState build() {
+    _apiClient = ref.read(apiClientProvider);
+    _prefs = ref.read(sharedPreferencesProvider);
+    _sseService = ref.read(sseServiceProvider);
     _loadStoredAuth();
+    return const AuthState();
   }
 
   Future<void> _loadStoredAuth() async {
@@ -76,7 +90,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: _prefs.getString(_emailKey),
         role: _prefs.getString(_roleKey),
       );
-      // Connect SSE with stored token
       _connectSSE(token);
     }
   }
@@ -87,43 +100,30 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final response = await _apiClient.auth.login(email, password);
 
-      if (response.data['success'] == true) {
-        final data = response.data['data'];
-        final token = data['access_token'] as String;
-        final refreshToken = data['refresh_token'] as String;
-        final user = data['user'] as Map<String, dynamic>;
+      final token = response.data.accessToken;
+      final refreshToken = response.data.refreshToken;
+      final user = response.data.user;
 
-        // Store tokens
-        await _prefs.setString(_tokenKey, token);
-        await _prefs.setString(_refreshTokenKey, refreshToken);
-        await _prefs.setInt(_userIdKey, user['id'] as int);
-        await _prefs.setString(_emailKey, user['email'] as String);
-        await _prefs.setString(_roleKey, user['role'] as String);
+      await _prefs.setString(_tokenKey, token);
+      await _prefs.setString(_refreshTokenKey, refreshToken);
+      await _prefs.setInt(_userIdKey, user.id);
+      await _prefs.setString(_emailKey, user.email);
+      await _prefs.setString(_roleKey, user.role.name);
 
-        // Set auth header
-        _apiClient.setAuthToken(token);
+      _apiClient.setAuthToken(token);
+      _connectSSE(token);
 
-        // Connect SSE
-        _connectSSE(token);
+      state = AuthState(
+        isAuthenticated: true,
+        isLoading: false,
+        token: token,
+        refreshToken: refreshToken,
+        userId: user.id,
+        email: user.email,
+        role: user.role.name,
+      );
 
-        state = AuthState(
-          isAuthenticated: true,
-          isLoading: false,
-          token: token,
-          refreshToken: refreshToken,
-          userId: user['id'] as int,
-          email: user['email'] as String,
-          role: user['role'] as String,
-        );
-
-        return true;
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          error: response.data['error'] ?? 'Login failed',
-        );
-        return false;
-      }
+      return true;
     } on DioException catch (e) {
       final error = e.response?.data?['error'] ?? 'Network error';
       state = state.copyWith(isLoading: false, error: error);
@@ -136,7 +136,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   void _connectSSE(String token) {
     _sseService.connect(SSEConfig.defaultUrl, token: token).then((_) {
-      // Subscribe to default channels
       for (final channel in SSEConfig.defaultChannels) {
         _sseService.subscribe(channel);
       }
@@ -144,25 +143,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
-    // Disconnect SSE first
     _sseService.disconnect();
 
     try {
       await _apiClient.auth.logout();
-    } catch (_) {
-      // Ignore logout API errors
-    }
+    } catch (_) {}
 
-    // Clear stored tokens
     await _prefs.remove(_tokenKey);
     await _prefs.remove(_refreshTokenKey);
     await _prefs.remove(_userIdKey);
     await _prefs.remove(_emailKey);
     await _prefs.remove(_roleKey);
 
-    // Clear API client auth
     _apiClient.clearAuthToken();
-
     state = const AuthState();
   }
 
@@ -172,20 +165,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       final response = await _apiClient.auth.refresh(storedRefreshToken);
+      final token = response.data.accessToken;
 
-      if (response.data['success'] == true) {
-        final data = response.data['data'];
-        final token = data['access_token'] as String;
+      await _prefs.setString(_tokenKey, token);
+      _apiClient.setAuthToken(token);
 
-        await _prefs.setString(_tokenKey, token);
-        _apiClient.setAuthToken(token);
-
-        state = state.copyWith(token: token);
-        return true;
-      }
+      state = state.copyWith(token: token);
+      return true;
     } catch (_) {}
 
-    // Refresh failed, logout
     await logout();
     return false;
   }
@@ -195,7 +183,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     try {
       final response = await _apiClient.auth.me();
-      return response.data['success'] == true;
+      return response.success;
     } catch (_) {
       return false;
     }
@@ -205,18 +193,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = state.copyWith(isLoading: true, error: null);
 
     try {
-      final response = await _apiClient.auth.register(email, password);
-
-      if (response.data['success'] == true) {
-        // Registration successful, now login
-        return await login(email, password);
-      } else {
-        state = state.copyWith(
-          isLoading: false,
-          error: response.data['error'] ?? 'Registration failed',
-        );
-        return false;
-      }
+      await _apiClient.auth.register(email, password);
+      return await login(email, password);
     } on DioException catch (e) {
       final error = e.response?.data?['error'] ?? 'Network error';
       state = state.copyWith(isLoading: false, error: error);
@@ -227,16 +205,3 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 }
-
-// Provider for SharedPreferences
-final sharedPreferencesProvider = Provider<SharedPreferences>((ref) {
-  throw UnimplementedError('SharedPreferences must be overridden');
-});
-
-// Auth state provider
-final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  final apiClient = ref.watch(apiClientProvider);
-  final prefs = ref.watch(sharedPreferencesProvider);
-  final sse = ref.watch(sseServiceProvider);
-  return AuthNotifier(apiClient, prefs, sse);
-});

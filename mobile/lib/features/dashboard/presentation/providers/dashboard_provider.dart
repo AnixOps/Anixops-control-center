@@ -209,14 +209,13 @@ class DashboardState {
 }
 
 /// Dashboard notifier
-class DashboardNotifier extends StateNotifier<DashboardState> {
-  final Ref _ref;
-
-  DashboardNotifier(this._ref) : super(const DashboardState());
+class DashboardNotifier extends Notifier<DashboardState> {
+  @override
+  DashboardState build() => const DashboardState();
 
   Future<void> fetchStats() async {
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       final response = await api.dio.get('/dashboard/stats');
       final stats = DashboardStats.fromJson(response.data);
       state = state.copyWith(stats: stats, lastUpdate: DateTime.now());
@@ -227,7 +226,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
   Future<void> fetchActivities({int limit = 10}) async {
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       final response = await api.dio.get('/dashboard/activities', queryParameters: {'limit': limit});
       final data = response.data;
       final List<Activity> activities = (data['data'] ?? data)
@@ -241,7 +240,7 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 
   Future<void> fetchAlerts() async {
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       final response = await api.dio.get('/dashboard/alerts');
       final data = response.data;
       final List<Alert> alerts = (data['data'] ?? data)
@@ -292,6 +291,4 @@ class DashboardNotifier extends StateNotifier<DashboardState> {
 }
 
 /// Provider for dashboard state
-final dashboardProvider = StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
-  return DashboardNotifier(ref);
-});
+final dashboardProvider = NotifierProvider<DashboardNotifier, DashboardState>(DashboardNotifier.new);

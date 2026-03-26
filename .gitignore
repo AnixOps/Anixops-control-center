@@ -71,3 +71,4 @@ configs/config.prod.yaml
 
 # Local secrets and test data (NEVER COMMIT)
 .local/
+reports/

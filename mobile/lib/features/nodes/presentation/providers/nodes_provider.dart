@@ -134,17 +134,27 @@ class NodesState {
   int get offlineCount => nodes.where((n) => n.status == 'offline').length;
 }
 
+/// Provider for nodes state
+final nodesProvider = NotifierProvider<NodesNotifier, NodesState>(NodesNotifier.new);
+
+/// Provider for a single node by ID
+final nodeProvider = Provider.family<Node?, String>((ref, id) {
+  final state = ref.watch(nodesProvider);
+  return state.nodes.where((n) => n.id == id).firstOrNull;
+});
+
 /// Nodes notifier
-class NodesNotifier extends StateNotifier<NodesState> {
-  final Ref _ref;
+class NodesNotifier extends Notifier<NodesState> {
   StreamSubscription<bool>? _connectionSubscription;
 
-  NodesNotifier(this._ref) : super(const NodesState()) {
+  @override
+  NodesState build() {
     _bindRealtimeUpdates();
+    return const NodesState();
   }
 
   void _bindRealtimeUpdates() {
-    final sse = _ref.read(sseServiceProvider);
+    final sse = ref.read(sseServiceProvider);
 
     sse.on('node_update', _handleNodeUpdate);
     _connectionSubscription = sse.connectionState.listen((connected) {
@@ -177,7 +187,7 @@ class NodesNotifier extends StateNotifier<NodesState> {
     state = state.copyWith(loading: true, error: null);
 
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       final response = await api.nodes.list(
         search: state.search.isNotEmpty ? state.search : null,
         status: state.statusFilter.isNotEmpty ? state.statusFilter : null,
@@ -186,15 +196,28 @@ class NodesNotifier extends StateNotifier<NodesState> {
       );
 
       final data = response.data;
-      final List<Node> nodes = (data['data'] ?? data)
-          .map<Node>((json) => Node.fromJson(json))
+      final List<Node> nodes = (data.items)
+          .map<Node>((json) => Node.fromJson({
+            'id': json.id,
+            'name': json.name,
+            'host': json.host,
+            'port': json.port,
+            'status': json.status.name,
+            'type': 'v2ray',
+            'users': 0,
+            'traffic': 0,
+            'last_seen': json.lastSeen,
+            'cpu_usage': null,
+            'memory_usage': null,
+            'version': json.agentVersion,
+          }))
           .toList();
 
       state = state.copyWith(
         nodes: refresh ? nodes : [...state.nodes, ...nodes],
         loading: false,
         page: page ?? state.page,
-        total: data['total'] ?? nodes.length,
+        total: data.total,
       );
     } catch (e) {
       state = state.copyWith(
@@ -225,7 +248,7 @@ class NodesNotifier extends StateNotifier<NodesState> {
 
   Future<void> startNode(String id) async {
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       await api.nodes.start(id);
       updateNodeStatus(id, 'starting');
     } catch (e) {
@@ -236,7 +259,7 @@ class NodesNotifier extends StateNotifier<NodesState> {
 
   Future<void> stopNode(String id) async {
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       await api.nodes.stop(id);
       updateNodeStatus(id, 'stopping');
     } catch (e) {
@@ -247,7 +270,7 @@ class NodesNotifier extends StateNotifier<NodesState> {
 
   Future<void> restartNode(String id) async {
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       await api.nodes.restart(id);
       updateNodeStatus(id, 'restarting');
     } catch (e) {
@@ -258,7 +281,7 @@ class NodesNotifier extends StateNotifier<NodesState> {
 
   Future<void> deleteNode(String id) async {
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       await api.nodes.delete(id);
       state = state.copyWith(
         nodes: state.nodes.where((n) => n.id != id).toList(),
@@ -316,22 +339,4 @@ class NodesNotifier extends StateNotifier<NodesState> {
     }).toList();
     state = state.copyWith(nodes: nodes);
   }
-  @override
-  void dispose() {
-    final sse = _ref.read(sseServiceProvider);
-    sse.off('node_update', _handleNodeUpdate);
-    _connectionSubscription?.cancel();
-    super.dispose();
-  }
 }
-
-/// Provider for nodes state
-final nodesProvider = StateNotifierProvider<NodesNotifier, NodesState>((ref) {
-  return NodesNotifier(ref);
-});
-
-/// Provider for a single node by ID
-final nodeProvider = Provider.family<Node?, String>((ref, id) {
-  final state = ref.watch(nodesProvider);
-  return state.nodes.where((n) => n.id == id).firstOrNull;
-});

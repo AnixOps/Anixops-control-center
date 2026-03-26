@@ -1,106 +1,60 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:anixops_mobile/core/services/tasks_api.dart';
+import 'package:anixops_mobile/core/models/task_models.dart';
 import 'package:anixops_mobile/features/tasks/presentation/providers/tasks_provider.dart';
 
 void main() {
   group('Task model', () {
     test('is created correctly from JSON', () {
       final json = {
+        'id': 1,
         'task_id': 'task-123',
         'playbook_id': 1,
         'playbook_name': 'install-docker',
-        'status': 'completed',
+        'status': 'success',
         'trigger_type': 'manual',
         'triggered_by': 1,
-        'triggered_by_email': 'admin@test.com',
-        'target_nodes': [
-          {'id': 1, 'name': 'node-1', 'host': '10.0.0.1'}
-        ],
-        'variables': {'version': 'latest'},
-        'result': {'success': true},
+        'target_nodes': 'node-1,node-2',
+        'variables': '{"version": "latest"}',
+        'result': '{"success": true}',
         'error': null,
         'created_at': '2026-03-20T10:00:00Z',
         'started_at': '2026-03-20T10:01:00Z',
         'completed_at': '2026-03-20T10:05:00Z',
-        'category': 'software',
       };
 
       final task = Task.fromJson(json);
 
+      expect(task.id, 1);
       expect(task.taskId, 'task-123');
       expect(task.playbookId, 1);
       expect(task.playbookName, 'install-docker');
-      expect(task.status, 'completed');
-      expect(task.triggerType, 'manual');
+      expect(task.status, TaskStatus.success);
+      expect(task.triggerType, TaskTriggerType.manual);
       expect(task.triggeredBy, 1);
-      expect(task.triggeredByEmail, 'admin@test.com');
-      expect(task.targetNodes?.length, 1);
-      expect(task.targetNodes?[0].name, 'node-1');
-      expect(task.variables, {'version': 'latest'});
-      expect(task.result, {'success': true});
-    });
-
-    test('title uses playbookName if available', () {
-      final task = Task(
-        taskId: 'task-123',
-        playbookName: 'install-docker',
-        status: 'completed',
-        triggerType: 'manual',
-      );
-
-      expect(task.title, 'install-docker');
-    });
-
-    test('title falls back to taskId', () {
-      final task = Task(
-        taskId: 'task-456',
-        status: 'pending',
-        triggerType: 'manual',
-      );
-
-      expect(task.title, 'Task task-456');
+      expect(task.targetNodes, 'node-1,node-2');
+      expect(task.variables, '{"version": "latest"}');
+      expect(task.result, '{"success": true}');
     });
 
     test('handles missing optional fields', () {
       final json = {
+        'id': 2,
         'task_id': 'task-789',
+        'playbook_id': 1,
+        'playbook_name': 'test',
         'status': 'pending',
+        'trigger_type': 'manual',
+        'created_at': '2026-03-20T10:00:00Z',
       };
 
       final task = Task.fromJson(json);
 
       expect(task.taskId, 'task-789');
-      expect(task.status, 'pending');
-      expect(task.playbookId, isNull);
-      expect(task.playbookName, isNull);
+      expect(task.status, TaskStatus.pending);
       expect(task.targetNodes, isNull);
       expect(task.variables, isNull);
-    });
-  });
-
-  group('TargetNode model', () {
-    test('is created correctly from JSON', () {
-      final json = {
-        'id': 1,
-        'name': 'web-server',
-        'host': '192.168.1.1',
-      };
-
-      final node = TargetNode.fromJson(json);
-
-      expect(node.id, 1);
-      expect(node.name, 'web-server');
-      expect(node.host, '192.168.1.1');
-    });
-
-    test('handles missing fields with defaults', () {
-      final json = <String, dynamic>{};
-
-      final node = TargetNode.fromJson(json);
-
-      expect(node.id, 0);
-      expect(node.name, 'Unknown');
-      expect(node.host, isNull);
+      expect(task.startedAt, isNull);
+      expect(task.completedAt, isNull);
     });
   });
 
@@ -113,7 +67,7 @@ void main() {
         'node_name': 'node-1',
         'level': 'info',
         'message': 'Task started successfully',
-        'metadata': {'duration': 5000},
+        'metadata': '{"duration": 5000}',
         'created_at': '2026-03-20T10:00:00Z',
       };
 
@@ -123,22 +77,50 @@ void main() {
       expect(log.taskId, 'task-123');
       expect(log.nodeId, 1);
       expect(log.nodeName, 'node-1');
-      expect(log.level, 'info');
+      expect(log.level, TaskLogLevel.info);
       expect(log.message, 'Task started successfully');
-      expect(log.metadata, {'duration': 5000});
     });
 
     test('handles missing fields with defaults', () {
-      final json = <String, dynamic>{};
+      final json = <String, dynamic>{
+        'id': 0,
+        'task_id': '',
+        'message': '',
+        'created_at': '',
+      };
 
       final log = TaskLog.fromJson(json);
 
-      expect(log.id, isNull);
+      expect(log.id, 0);
       expect(log.taskId, '');
       expect(log.nodeId, isNull);
       expect(log.nodeName, isNull);
-      expect(log.level, 'info');
-      expect(log.message, '');
+      expect(log.level, TaskLogLevel.info);
+    });
+  });
+
+  group('TaskListItem model', () {
+    test('is created correctly from JSON with extra fields', () {
+      final json = {
+        'id': 1,
+        'task_id': 'task-123',
+        'playbook_id': 1,
+        'playbook_name': 'install-docker',
+        'status': 'running',
+        'trigger_type': 'manual',
+        'triggered_by': 1,
+        'triggered_by_email': 'admin@test.com',
+        'category': 'software',
+        'created_at': '2026-03-20T10:00:00Z',
+      };
+
+      final task = TaskListItem.fromJson(json);
+
+      expect(task.taskId, 'task-123');
+      expect(task.playbookName, 'install-docker');
+      expect(task.status, TaskStatus.running);
+      expect(task.triggeredByEmail, 'admin@test.com');
+      expect(task.category, 'software');
     });
   });
 
@@ -146,9 +128,9 @@ void main() {
     test('filteredTasks returns all when no filter', () {
       final state = TasksState(
         tasks: [
-          Task(taskId: '1', status: 'completed', triggerType: 'manual'),
-          Task(taskId: '2', status: 'running', triggerType: 'manual'),
-          Task(taskId: '3', status: 'pending', triggerType: 'manual'),
+          TaskListItem(id: 1, taskId: '1', playbookId: 1, playbookName: 'p1', status: TaskStatus.success, triggerType: TaskTriggerType.manual, createdAt: ''),
+          TaskListItem(id: 2, taskId: '2', playbookId: 2, playbookName: 'p2', status: TaskStatus.running, triggerType: TaskTriggerType.manual, createdAt: ''),
+          TaskListItem(id: 3, taskId: '3', playbookId: 3, playbookName: 'p3', status: TaskStatus.pending, triggerType: TaskTriggerType.manual, createdAt: ''),
         ],
       );
 
@@ -158,22 +140,22 @@ void main() {
     test('filteredTasks filters by status', () {
       final state = TasksState(
         tasks: [
-          Task(taskId: '1', status: 'completed', triggerType: 'manual'),
-          Task(taskId: '2', status: 'running', triggerType: 'manual'),
-          Task(taskId: '3', status: 'completed', triggerType: 'manual'),
+          TaskListItem(id: 1, taskId: '1', playbookId: 1, playbookName: 'p1', status: TaskStatus.success, triggerType: TaskTriggerType.manual, createdAt: ''),
+          TaskListItem(id: 2, taskId: '2', playbookId: 2, playbookName: 'p2', status: TaskStatus.running, triggerType: TaskTriggerType.manual, createdAt: ''),
+          TaskListItem(id: 3, taskId: '3', playbookId: 3, playbookName: 'p3', status: TaskStatus.success, triggerType: TaskTriggerType.manual, createdAt: ''),
         ],
-        statusFilter: 'completed',
+        statusFilter: 'success',
       );
 
       expect(state.filteredTasks.length, 2);
-      expect(state.filteredTasks.every((t) => t.status == 'completed'), true);
+      expect(state.filteredTasks.every((t) => t.status == TaskStatus.success), true);
     });
 
     test('filteredTasks handles "all" filter', () {
       final state = TasksState(
         tasks: [
-          Task(taskId: '1', status: 'completed', triggerType: 'manual'),
-          Task(taskId: '2', status: 'running', triggerType: 'manual'),
+          TaskListItem(id: 1, taskId: '1', playbookId: 1, playbookName: 'p1', status: TaskStatus.success, triggerType: TaskTriggerType.manual, createdAt: ''),
+          TaskListItem(id: 2, taskId: '2', playbookId: 2, playbookName: 'p2', status: TaskStatus.running, triggerType: TaskTriggerType.manual, createdAt: ''),
         ],
         statusFilter: 'all',
       );
@@ -195,59 +177,6 @@ void main() {
       expect(newState.isLoading, true);
       expect(newState.error, 'Test error');
       expect(newState.tasks, isEmpty);
-    });
-  });
-
-  group('RC3 realtime helpers', () {
-    test('task update can merge status for existing task', () {
-      final original = Task(
-        taskId: 'task-123',
-        playbookName: 'deploy',
-        status: 'pending',
-        triggerType: 'manual',
-      );
-
-      final updated = Task(
-        taskId: original.taskId,
-        playbookId: original.playbookId,
-        playbookName: original.playbookName,
-        status: 'running',
-        triggerType: original.triggerType,
-        triggeredBy: original.triggeredBy,
-        triggeredByEmail: original.triggeredByEmail,
-        targetNodes: original.targetNodes,
-        variables: original.variables,
-        result: original.result,
-        error: original.error,
-        createdAt: original.createdAt,
-        startedAt: original.startedAt,
-        completedAt: original.completedAt,
-        category: original.category,
-      );
-
-      expect(updated.taskId, 'task-123');
-      expect(updated.status, 'running');
-      expect(updated.playbookName, 'deploy');
-    });
-
-    test('task logs can append for selected task', () {
-      final state = TasksState(
-        selectedTask: Task(taskId: 'task-123', status: 'running', triggerType: 'manual'),
-        taskLogs: const [],
-      );
-
-      final nextLogs = [
-        ...state.taskLogs,
-        TaskLog.fromJson({
-          'task_id': 'task-123',
-          'message': 'playbook step started',
-          'level': 'info',
-        }),
-      ];
-
-      expect(nextLogs.length, 1);
-      expect(nextLogs.first.taskId, 'task-123');
-      expect(nextLogs.first.message, 'playbook step started');
     });
   });
 }

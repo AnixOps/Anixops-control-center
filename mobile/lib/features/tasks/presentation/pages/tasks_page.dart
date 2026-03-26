@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/tasks_api.dart';
+import '../../../../core/models/task_models.dart';
 import '../providers/tasks_provider.dart';
 import 'task_detail_page.dart';
 
@@ -93,10 +93,10 @@ class TasksPage extends ConsumerWidget {
           return _TaskCard(
             task: task,
             onTap: () => _openTaskDetail(context, task),
-            onCancel: task.status == 'pending' || task.status == 'running'
+            onCancel: task.status == TaskStatus.pending || task.status == TaskStatus.running
                 ? () => _cancelTask(context, ref, task.taskId)
                 : null,
-            onRetry: task.status == 'failed' || task.status == 'cancelled'
+            onRetry: task.status == TaskStatus.failed || task.status == TaskStatus.cancelled
                 ? () => _retryTask(context, ref, task.taskId)
                 : null,
           );
@@ -105,7 +105,7 @@ class TasksPage extends ConsumerWidget {
     );
   }
 
-  void _openTaskDetail(BuildContext context, Task task) {
+  void _openTaskDetail(BuildContext context, TaskListItem task) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -145,11 +145,11 @@ class TasksPage extends ConsumerWidget {
   }
 
   Future<void> _retryTask(BuildContext context, WidgetRef ref, String taskId) async {
-    final task = await ref.read(tasksProvider.notifier).retryTask(taskId);
+    final success = await ref.read(tasksProvider.notifier).retryTask(taskId);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(task != null ? 'Task retry created: ${task.taskId}' : 'Retry failed'),
+          content: Text(success ? 'Task retry created' : 'Retry failed'),
         ),
       );
     }
@@ -157,7 +157,7 @@ class TasksPage extends ConsumerWidget {
 }
 
 class _TaskCard extends StatelessWidget {
-  final Task task;
+  final TaskListItem task;
   final VoidCallback onTap;
   final VoidCallback? onCancel;
   final VoidCallback? onRetry;
@@ -171,43 +171,45 @@ class _TaskCard extends StatelessWidget {
 
   Color _getStatusColor() {
     switch (task.status) {
-      case 'pending':
+      case TaskStatus.pending:
         return Colors.grey;
-      case 'running':
+      case TaskStatus.running:
         return Colors.blue;
-      case 'success':
+      case TaskStatus.success:
         return Colors.green;
-      case 'failed':
+      case TaskStatus.failed:
         return Colors.red;
-      case 'cancelled':
+      case TaskStatus.cancelled:
         return Colors.orange;
-      default:
-        return Colors.grey;
     }
   }
 
   IconData _getStatusIcon() {
     switch (task.status) {
-      case 'pending':
+      case TaskStatus.pending:
         return Icons.schedule;
-      case 'running':
+      case TaskStatus.running:
         return Icons.play_circle;
-      case 'success':
+      case TaskStatus.success:
         return Icons.check_circle;
-      case 'failed':
+      case TaskStatus.failed:
         return Icons.error;
-      case 'cancelled':
+      case TaskStatus.cancelled:
         return Icons.cancel;
-      default:
-        return Icons.help;
     }
   }
 
   String _formatDuration() {
     if (task.startedAt == null) return 'Not started';
 
-    final end = task.completedAt ?? DateTime.now();
-    final duration = end.difference(task.startedAt!);
+    final start = DateTime.tryParse(task.startedAt!);
+    if (start == null) return 'Not started';
+
+    final endStr = task.completedAt;
+    final end = endStr != null ? DateTime.tryParse(endStr) : DateTime.now();
+    if (end == null) return 'Not started';
+
+    final duration = end.difference(start);
 
     if (duration.inHours > 0) {
       return '${duration.inHours}h ${duration.inMinutes.remainder(60)}m';
@@ -252,13 +254,13 @@ class _TaskCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          task.title,
+                          task.playbookName,
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
                         Text(
-                          task.playbookName ?? 'Unknown playbook',
+                          task.playbookName,
                           style: theme.textTheme.bodySmall,
                         ),
                       ],
@@ -271,7 +273,7 @@ class _TaskCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
-                      task.status.toUpperCase(),
+                      task.status.name.toUpperCase(),
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
@@ -287,7 +289,7 @@ class _TaskCard extends StatelessWidget {
                   Icon(Icons.devices, size: 14, color: Colors.grey[600]),
                   const SizedBox(width: 4),
                   Text(
-                    '${task.targetNodes?.length ?? 0} nodes',
+                    '${task.targetNodes?.split(',').where((s) => s.trim().isNotEmpty).length ?? 0} nodes',
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(width: 16),
@@ -297,12 +299,12 @@ class _TaskCard extends StatelessWidget {
                     _formatDuration(),
                     style: theme.textTheme.bodySmall,
                   ),
-                  if (task.createdAt != null) ...[
+                  if (task.createdAt.isNotEmpty) ...[
                     const SizedBox(width: 16),
                     Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
                     const SizedBox(width: 4),
                     Text(
-                      '${task.createdAt!.day}/${task.createdAt!.month}',
+                      task.createdAt.split('T').first.split('-').reversed.take(2).join('/'),
                       style: theme.textTheme.bodySmall,
                     ),
                   ],

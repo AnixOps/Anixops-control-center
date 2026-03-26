@@ -114,11 +114,19 @@ class PluginsState {
   int get enabledCount => plugins.where((p) => p.enabled).length;
 }
 
-/// Plugins notifier
-class PluginsNotifier extends StateNotifier<PluginsState> {
-  final Ref _ref;
+/// Provider for plugins state
+final pluginsProvider = NotifierProvider<PluginsNotifier, PluginsState>(PluginsNotifier.new);
 
-  PluginsNotifier(this._ref) : super(const PluginsState());
+/// Provider for a single plugin by name
+final pluginProvider = Provider.family<Plugin?, String>((ref, name) {
+  final state = ref.watch(pluginsProvider);
+  return state.plugins.where((p) => p.name == name).firstOrNull;
+});
+
+/// Plugins notifier
+class PluginsNotifier extends Notifier<PluginsState> {
+  @override
+  PluginsState build() => const PluginsState();
 
   Future<void> fetchPlugins() async {
     if (state.loading) return;
@@ -126,13 +134,25 @@ class PluginsNotifier extends StateNotifier<PluginsState> {
     state = state.copyWith(loading: true, error: null);
 
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       final response = await api.plugins.list();
 
-      final data = response.data;
-      final List<Plugin> plugins = (data['data'] ?? data)
-          .map<Plugin>((json) => Plugin.fromJson(json))
-          .toList();
+      // Convert API Plugin model to local Plugin model
+      final List<Plugin> plugins = response.data.items.map((apiPlugin) {
+        return Plugin(
+          name: apiPlugin.name,
+          displayName: apiPlugin.displayName ?? apiPlugin.name,
+          version: apiPlugin.version ?? '0.0.0',
+          status: apiPlugin.enabled ? 'running' : 'stopped',
+          description: apiPlugin.description,
+          author: apiPlugin.author,
+          enabled: apiPlugin.enabled,
+          config: apiPlugin.config != null
+              ? Map<String, dynamic>.from({}) // Parse config string if needed
+              : null,
+          lastStarted: null,
+        );
+      }).toList();
 
       state = state.copyWith(
         plugins: plugins,
@@ -157,7 +177,7 @@ class PluginsNotifier extends StateNotifier<PluginsState> {
   Future<void> startPlugin(String name) async {
     try {
       state = state.copyWith(executing: true);
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       await api.plugins.start(name);
       updatePluginStatus(name, 'running');
     } catch (e) {
@@ -171,7 +191,7 @@ class PluginsNotifier extends StateNotifier<PluginsState> {
   Future<void> stopPlugin(String name) async {
     try {
       state = state.copyWith(executing: true);
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       await api.plugins.stop(name);
       updatePluginStatus(name, 'stopped');
     } catch (e) {
@@ -185,7 +205,7 @@ class PluginsNotifier extends StateNotifier<PluginsState> {
   Future<void> restartPlugin(String name) async {
     try {
       state = state.copyWith(executing: true);
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       await api.plugins.restart(name);
       updatePluginStatus(name, 'running');
     } catch (e) {
@@ -198,7 +218,7 @@ class PluginsNotifier extends StateNotifier<PluginsState> {
 
   Future<void> enablePlugin(String name) async {
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       await api.plugins.enable(name);
       final plugins = state.plugins.map((p) {
         if (p.name == name) {
@@ -225,7 +245,7 @@ class PluginsNotifier extends StateNotifier<PluginsState> {
 
   Future<void> disablePlugin(String name) async {
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       await api.plugins.disable(name);
       final plugins = state.plugins.map((p) {
         if (p.name == name) {
@@ -252,9 +272,9 @@ class PluginsNotifier extends StateNotifier<PluginsState> {
 
   Future<Map<String, dynamic>?> fetchPluginConfig(String name) async {
     try {
-      final api = _ref.read(apiClientProvider);
-      final response = await api.plugins.config(name);
-      return response.data;
+      final api = ref.read(apiClientProvider);
+      final config = await api.plugins.config(name);
+      return config;
     } catch (e) {
       state = state.copyWith(error: e.toString());
       rethrow;
@@ -263,7 +283,7 @@ class PluginsNotifier extends StateNotifier<PluginsState> {
 
   Future<void> updatePluginConfig(String name, Map<String, dynamic> config) async {
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       await api.plugins.updateConfig(name, config);
       final plugins = state.plugins.map((p) {
         if (p.name == name) {
@@ -308,14 +328,3 @@ class PluginsNotifier extends StateNotifier<PluginsState> {
     state = state.copyWith(plugins: plugins);
   }
 }
-
-/// Provider for plugins state
-final pluginsProvider = StateNotifierProvider<PluginsNotifier, PluginsState>((ref) {
-  return PluginsNotifier(ref);
-});
-
-/// Provider for a single plugin by name
-final pluginProvider = Provider.family<Plugin?, String>((ref, name) {
-  final state = ref.watch(pluginsProvider);
-  return state.plugins.where((p) => p.name == name).firstOrNull;
-});

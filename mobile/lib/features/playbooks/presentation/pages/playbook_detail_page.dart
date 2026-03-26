@@ -1,6 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/services/playbooks_api.dart';
+import '../../../../core/models/playbook_models.dart';
 import '../providers/playbooks_provider.dart';
 
 class PlaybookDetailPage extends ConsumerStatefulWidget {
@@ -42,11 +43,16 @@ class _PlaybookDetailPageState extends ConsumerState<PlaybookDetailPage> {
       final playbook = await ref.read(playbooksProvider.notifier).getPlaybook(widget.playbookName);
 
       // Initialize variable controllers
-      if (playbook.variables != null) {
-        for (final entry in playbook.variables!.entries) {
-          final varInfo = entry.value as Map<String, dynamic>;
-          final defaultValue = varInfo['default']?.toString() ?? '';
-          _variableControllers[entry.key] = TextEditingController(text: defaultValue);
+      if (playbook?.variables != null && playbook!.variables!.isNotEmpty) {
+        try {
+          final varsMap = jsonDecode(playbook.variables!) as Map<String, dynamic>;
+          for (final entry in varsMap.entries) {
+            final varInfo = entry.value as Map<String, dynamic>;
+            final defaultValue = varInfo['default']?.toString() ?? '';
+            _variableControllers[entry.key] = TextEditingController(text: defaultValue);
+          }
+        } catch (_) {
+          // Ignore JSON parse errors
         }
       }
 
@@ -68,7 +74,7 @@ class _PlaybookDetailPageState extends ConsumerState<PlaybookDetailPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_playbook?.title ?? 'Loading...'),
+        title: Text(_playbook?.name ?? 'Loading...'),
         actions: [
           if (_playbook != null)
             IconButton(
@@ -250,12 +256,22 @@ class _PlaybookDetailPageState extends ConsumerState<PlaybookDetailPage> {
   }
 
   Widget _buildVariablesCard(ThemeData theme) {
+    // Parse variables JSON string
+    Map<String, dynamic> varsMap = {};
+    if (_playbook!.variables != null && _playbook!.variables!.isNotEmpty) {
+      try {
+        varsMap = jsonDecode(_playbook!.variables!) as Map<String, dynamic>;
+      } catch (_) {
+        // Ignore JSON parse errors
+      }
+    }
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: _playbook!.variables!.entries.map((entry) {
+          children: varsMap.entries.map((entry) {
             final varName = entry.key;
             final varInfo = entry.value as Map<String, dynamic>;
             final description = varInfo['description'] as String?;
@@ -335,7 +351,7 @@ class _PlaybookDetailPageState extends ConsumerState<PlaybookDetailPage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                _playbook!.content ?? '',
+                _playbook!.description ?? 'No description available',
                 style: const TextStyle(
                   fontFamily: 'monospace',
                   fontSize: 12,

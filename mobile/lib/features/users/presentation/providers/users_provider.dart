@@ -141,11 +141,19 @@ class UsersState {
   int get adminCount => users.where((u) => u.role == 'admin').length;
 }
 
-/// Users notifier
-class UsersNotifier extends StateNotifier<UsersState> {
-  final Ref _ref;
+/// Provider for users state
+final usersProvider = NotifierProvider<UsersNotifier, UsersState>(UsersNotifier.new);
 
-  UsersNotifier(this._ref) : super(const UsersState());
+/// Provider for a single user by ID
+final userProvider = Provider.family<User?, String>((ref, id) {
+  final state = ref.watch(usersProvider);
+  return state.users.where((u) => u.id == id).firstOrNull;
+});
+
+/// Users notifier
+class UsersNotifier extends Notifier<UsersState> {
+  @override
+  UsersState build() => const UsersState();
 
   Future<void> fetchUsers({int? page, bool refresh = false}) async {
     if (state.loading) return;
@@ -153,7 +161,7 @@ class UsersNotifier extends StateNotifier<UsersState> {
     state = state.copyWith(loading: true, error: null);
 
     try {
-      final api = _ref.read(apiClientProvider);
+      final api = ref.read(apiClientProvider);
       final response = await api.users.list(
         search: state.search.isNotEmpty ? state.search : null,
         role: state.roleFilter.isNotEmpty ? state.roleFilter : null,
@@ -161,16 +169,32 @@ class UsersNotifier extends StateNotifier<UsersState> {
         page: page ?? state.page,
       );
 
-      final data = response.data;
-      final List<User> users = (data['data'] ?? data)
-          .map<User>((json) => User.fromJson(json))
-          .toList();
+      // Convert API users to local User format
+      final List<User> users = response.data.items.map((apiUser) {
+        return User(
+          id: apiUser.id.toString(),
+          email: apiUser.email,
+          name: null,
+          role: apiUser.role.name,
+          status: apiUser.enabled ? 'active' : 'disabled',
+          trafficUsed: null,
+          trafficLimit: null,
+          expireAt: null,
+          createdAt: apiUser.createdAt != null
+              ? DateTime.tryParse(apiUser.createdAt)
+              : null,
+          lastLoginAt: apiUser.lastLoginAt != null
+              ? DateTime.tryParse(apiUser.lastLoginAt!)
+              : null,
+          nodeIds: null,
+        );
+      }).toList();
 
       state = state.copyWith(
         users: refresh ? users : [...state.users, ...users],
         loading: false,
         page: page ?? state.page,
-        total: data['total'] ?? users.length,
+        total: response.data.total,
       );
     } catch (e) {
       state = state.copyWith(
@@ -201,8 +225,8 @@ class UsersNotifier extends StateNotifier<UsersState> {
 
   Future<void> banUser(String id) async {
     try {
-      final api = _ref.read(apiClientProvider);
-      await api.users.ban(id);
+      final api = ref.read(apiClientProvider);
+      await api.users.ban(int.parse(id));
       updateUserStatus(id, 'banned');
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -212,8 +236,8 @@ class UsersNotifier extends StateNotifier<UsersState> {
 
   Future<void> unbanUser(String id) async {
     try {
-      final api = _ref.read(apiClientProvider);
-      await api.users.unban(id);
+      final api = ref.read(apiClientProvider);
+      await api.users.unban(int.parse(id));
       updateUserStatus(id, 'active');
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -223,8 +247,8 @@ class UsersNotifier extends StateNotifier<UsersState> {
 
   Future<void> deleteUser(String id) async {
     try {
-      final api = _ref.read(apiClientProvider);
-      await api.users.delete(id);
+      final api = ref.read(apiClientProvider);
+      await api.users.delete(int.parse(id));
       state = state.copyWith(
         users: state.users.where((u) => u.id != id).toList(),
       );
@@ -236,8 +260,8 @@ class UsersNotifier extends StateNotifier<UsersState> {
 
   Future<void> updateRole(String id, String role) async {
     try {
-      final api = _ref.read(apiClientProvider);
-      await api.users.updateRole(id, role);
+      final api = ref.read(apiClientProvider);
+      await api.users.updateRole(int.parse(id), role);
       final users = state.users.map((u) {
         if (u.id == id) {
           return User(
@@ -285,14 +309,3 @@ class UsersNotifier extends StateNotifier<UsersState> {
     state = state.copyWith(users: users);
   }
 }
-
-/// Provider for users state
-final usersProvider = StateNotifierProvider<UsersNotifier, UsersState>((ref) {
-  return UsersNotifier(ref);
-});
-
-/// Provider for a single user by ID
-final userProvider = Provider.family<User?, String>((ref, id) {
-  final state = ref.watch(usersProvider);
-  return state.users.where((u) => u.id == id).firstOrNull;
-});
