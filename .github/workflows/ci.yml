@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [dev, production, 'v*.*.*']
+    branches: [master, dev, production, 'v*.*.*']
   pull_request:
-    branches: [dev, production]
+    branches: [master, dev, production]
 
 env:
   GO_VERSION: '1.24'
@@ -70,6 +70,58 @@ jobs:
           files: ./workers/coverage/lcov.info
           fail_ci_if_error: false
           flags: workers
+
+  # ============================================
+  # Control Center Web Tests and Browser Gate
+  # ============================================
+  web-test:
+    name: Control Center Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Run frontend unit tests
+        working-directory: web
+        run: npm test -- --run
+
+      - name: Build production frontend
+        working-directory: web
+        run: npm run build
+
+      - name: Audit production dependencies
+        working-directory: web
+        run: npm audit --audit-level=high --omit=dev
+
+      - name: Install Chromium and system dependencies
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Chromium browser tests
+        working-directory: web
+        run: npm run test:e2e -- --project=chromium --reporter=line
+
+      - name: Upload web verification artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-center-web-verification-${{ github.run_id }}
+          path: |
+            web/playwright-report
+            web/test-results
+            web/dist
+          if-no-files-found: warn
+          retention-days: 14
 
   # ============================================
   # Unit Tests (Go)

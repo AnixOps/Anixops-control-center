@@ -12,6 +12,46 @@ const api = axios.create({
   }
 })
 
+// The Control kernel has its own origin and JWT issuer. Its default path uses
+// the Vite /api proxy in development and a same-origin route in production.
+function kernelBaseURL(configuredURL = import.meta.env.VITE_KERNEL_API_URL || '/api/v3') {
+  const configured = configuredURL.replace(/\/+$/, '')
+  if (/\/api\/v\d+$/.test(configured)) return configured.replace(/\/api\/v\d+$/, '/api/v3')
+  return `${configured}/api/v3`
+}
+
+const kernelAuthClient = axios.create({
+  baseURL: kernelBaseURL().replace(/\/api\/v3$/, '/api/v2'),
+  timeout: 30000,
+  headers: { 'Content-Type': 'application/json' }
+})
+
+const kernelApiClient = axios.create({
+  baseURL: kernelBaseURL(),
+  timeout: 30000,
+  headers: { 'Content-Type': 'application/json' }
+})
+
+kernelApiClient.interceptors.request.use((config) => {
+  const token = sessionStorage.getItem('kernel_token')
+  if (token) config.headers.Authorization = `Bearer ${token}`
+  return config
+})
+
+kernelApiClient.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      const requestToken = String(error.config?.headers?.Authorization || '').replace(/^Bearer\s+/, '')
+      if (!requestToken || requestToken === sessionStorage.getItem('kernel_token')) {
+        const authStore = useAuthStore()
+        authStore.disconnectKernel('Control session expired. Connect again.')
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
@@ -38,6 +78,18 @@ api.interceptors.response.use(
 )
 
 export default api
+
+export const kernelAuthApi = {
+  login: async ({ email, password, mfaCode, mfaMethod }) => {
+    const response = await kernelAuthClient.post('/login', {
+      email,
+      password,
+      ...(mfaCode ? { mfa_code: mfaCode } : {}),
+      ...(mfaMethod ? { mfa_method: mfaMethod } : {})
+    })
+    return response.data
+  }
+}
 
 // API methods
 export const nodesApi = {
@@ -87,6 +139,49 @@ export const pluginsApi = {
   start: (name) => api.post(`/admin/plugins/${name}/start`),
   stop: (name) => api.post(`/admin/plugins/${name}/stop`)
 }
+
+function unwrapKernel(response) {
+  return response?.data?.data ?? response?.data ?? response
+}
+
+function withKernelOperationHeaders(response, result) {
+  if (!result || typeof result !== 'object') return result
+  return {
+    ...result,
+    operation_id: response.headers?.['x-anixops-operation-id'] || '',
+    operation_chain: response.headers?.['x-anixops-operation-chain'] || ''
+  }
+}
+
+export const kernelPluginsApi = {
+  list: async () => unwrapKernel(await kernelApiClient.get('/plugins')),
+  releases: async (pluginId) => unwrapKernel(await kernelApiClient.get('/plugin-releases', {
+    params: pluginId ? { plugin_id: pluginId } : undefined
+  })),
+  installations: async () => unwrapKernel(await kernelApiClient.get('/plugin-installations')),
+  upsertInstallation: async (installation) => {
+    const response = await kernelApiClient.put('/plugin-installations', installation)
+    return withKernelOperationHeaders(response, unwrapKernel(response))
+  },
+  action: async (installationId, action, options = {}) => {
+    const data = { action, idempotency_key: options.idempotencyKey }
+    if (options.targetVersion) data.target_version = options.targetVersion
+    const response = await kernelApiClient.post(`/plugin-installations/${installationId}/actions`, data)
+    return withKernelOperationHeaders(response, unwrapKernel(response))
+  },
+  operations: async () => unwrapKernel(await kernelApiClient.get('/operations')),
+  getConfig: async (installationId) => unwrapKernel(await kernelApiClient.get(`/plugin-installations/${installationId}/config`)),
+  updateConfig: async (installationId, config, expectedRevision) => {
+    const response = await kernelApiClient.put(
+      `/plugin-installations/${installationId}/config`,
+      { config, ...(expectedRevision === undefined ? {} : { expected_revision: expectedRevision }) }
+    )
+    return withKernelOperationHeaders(response, unwrapKernel(response))
+  },
+  extensions: async () => unwrapKernel(await kernelApiClient.get('/extensions'))
+}
+
+export { kernelApiClient, kernelAuthClient, kernelBaseURL }
 
 export const logsApi = {
   list: (params) => api.get('/logs', { params })

@@ -7,10 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added a Control kernel plugin lifecycle page with an independent Control
+  administrator login, MFA challenge, signed catalog discovery, revisioned
+  configuration, Control/Agent actions, and operation status.
+- Added a CI web test job and browser coverage for the Control login-to-catalog
+  flow, session isolation, lifecycle actions, error states, and mobile layout.
+
 ### Changed
 
 - Development branch remains the place for post-v2.5.0 work.
 - RC builds before v2.5.0 final were treated as pre-releases only.
+
+### Fixed
+
+- Enabled Tailwind processing for the web build and made navigation usable on
+  mobile viewports.
 
 ## [v2.5.0] - 2026-03-23
 

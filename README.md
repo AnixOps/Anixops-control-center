@@ -32,6 +32,46 @@ go build -o anixops cmd/anixops/main.go
 ./anixops nodes list
 ```
 
+### Kernel Plugin Lifecycle
+
+The Web GUI exposes the Control kernel lifecycle at `/plugins`. Workers
+authentication and legacy pages keep using `VITE_API_URL` and `/api/v1`. The
+plugin page connects separately to Control through `/api/v2/login`, then calls
+its authenticated `/api/v3` API. The Control token stays in browser session
+storage; a Control 401 disconnects only that session. MFA code challenges are
+handled in the plugin page. An MFA enrollment requirement blocks connection
+until the account is enrolled in Anix Control. This page manages the plugin
+lifecycle; signed plugin WebUI modules are rendered by Control's own verified
+same-origin frontend.
+
+Set `VITE_KERNEL_API_URL` to the Control API origin or `/api/v3` URL in
+production. It defaults to same-origin `/api/v3`, which the Vite development
+server proxies to `localhost:8080`. Production hosting must route both
+`/api/v2/login` and `/api/v3` to the same Control instance. Keep verified
+WebUI assets on that same origin.
+
+```bash
+cd web
+npm install
+VITE_API_URL=https://api.anixops.com/api/v1 VITE_KERNEL_API_URL=/api/v3 npm run dev
+```
+
+Run the real local Control browser gate separately from the mocked suite:
+
+```bash
+ANIXOPS_REAL_CONTROL_WEB_PORT=3013 \
+ANIXOPS_REAL_CONTROL_API_PORT=38083 \
+npm run test:e2e:real-control -- --reporter=line
+```
+
+This gate starts an isolated `anix-control` process, performs `/api/v2/login`,
+and reads `/api/v3/plugins` plus `/api/v3/plugin-installations`. Workers auth
+is synthetic local storage in this test. By default the gate is read-only after
+bootstrap; set `ANIXOPS_AGENT_ROOT` and `ANIXOPS_REAL_CONTROL_LIFECYCLE=1` to
+build a signed `machine-telemetry` package and exercise Control-target
+disable/enable through the Center page. That remains isolated local-process
+evidence; live Agent mutation still requires staging evidence.
+
 ## Architecture
 
 ```
